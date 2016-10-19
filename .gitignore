@@ -5,4 +5,5 @@ node_modules/
 /nbproject/private/
 nbproject
 composer.phar
+/src/vendor
 composer.lock
