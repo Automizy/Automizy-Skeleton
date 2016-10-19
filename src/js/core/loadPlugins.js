@@ -24,6 +24,7 @@ define([
             checkReady(function ($) {
                 $ASP.pluginLoader.plugins([
                     {
+                        name:'fontAwesome',
                         skipCondition:(function () {
                             var span = document.createElement('span');
                             span.className = 'fa';
@@ -39,6 +40,7 @@ define([
                         css:$ASP.config.dir + "/vendor/fontawesome/css/font-awesome.min.css"
                     },
                     {
+                        name:'automizyJs',
                         skipCondition:typeof AutomizyJs !== 'undefined',
                         css:$ASP.config.dir + "/vendor/automizy-js/automizy.css",
                         js:[
@@ -50,6 +52,7 @@ define([
                         }
                     },
                     {
+                        name:'automizyJsApi',
                         skipCondition:typeof AutomizyJsApi !== 'undefined',
                         js:$ASP.config.dir + "/vendor/automizy-js-api/automizy.api.js"
                     }

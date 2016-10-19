@@ -15,6 +15,10 @@ set target=..\generatedModules\%moduleName1%
 
 mkdir %target%
 xcopy /Y /S /Q "." "%target%"
+rmdir /S /Q %target%\node_modules
+rmdir /S /Q %target%\.bower
+rmdir /S /Q %target%\.idea
+rmdir /S /Q %target%\src\vendor
 
 
 fart.exe -r -c -- %target%\src\* Automizy-Skeleton-Project %moduleName1%

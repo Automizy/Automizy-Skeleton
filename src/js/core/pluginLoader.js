@@ -28,6 +28,7 @@ define([
                 plugin.complete = plugin.complete || function () {};
                 plugin.css = plugin.css || [];
                 plugin.js = plugin.js || [];
+                plugin.name = plugin.name || ('automizy-plugin-' + ++AutomizyGlobalPlugins.i);
 
                 if (typeof plugin.css === 'string') {
                     plugin.css = [plugin.css];
@@ -47,8 +48,11 @@ define([
         var t = this;
 
         t.d.loadedPluginsCount++;
-        plugin.complete.apply(this, [true]);
-        console.log(t.d.loadedPluginsCount, t.d.allPluginsCount);
+        for(var i = 0; i < plugin.completeFunctions.length; i++){
+            plugin.completeFunctions[i].apply(plugin, [true]);
+            plugin.completed = true;
+        }
+        console.log('AutomizySkeletonProject plugins status: ' + (Math.floor(t.d.loadedPluginsCount / t.d.allPluginsCount * 100)) + '%');
         if (t.d.loadedPluginsCount === t.d.allPluginsCount) {
             t.complete();
         }
@@ -63,41 +67,62 @@ define([
         var noJsPlugins = [];
 
         for (var i = 0; i < t.d.plugins.length; i++) {
-            var plugin = t.d.plugins[i];
-            if (plugin.inited) {
+            var pluginLocal = t.d.plugins[i];
+            if (pluginLocal.inited) {
                 continue;
             }
-            plugin.inited = true;
+            pluginLocal.inited = true;
 
-            if (!plugin.skipCondition) {
-                hasActivePlugin = true;
-                for (var j = 0; j < plugin.css.length; j++) {
-                    var head = document.getElementsByTagName('head')[0];
-                    var link = document.createElement('link');
-                    link.rel = 'stylesheet';
-                    link.type = 'text/css';
-                    link.href = plugin.css[j];
-                    head.appendChild(link);
+            if(typeof AutomizyGlobalPlugins[pluginLocal.name] === 'undefined'){
+                AutomizyGlobalPlugins[pluginLocal.name] = {
+                    skipCondition:pluginLocal.skipCondition,
+                    css:pluginLocal.css,
+                    js:pluginLocal.js,
+                    completed:false,
+                    completeFunctions:[pluginLocal.complete]
                 }
-
-                (function (plugin) {
-                    var deferreds = [];
-
-                    t.d.allPluginsCount++;
-                    if (plugin.js.length <= 0) {
-                        noJsPlugins.push(plugin);
-                    } else {
-                        for (var j = 0; j < plugin.js.length; j++) {
-                            deferreds.push($.getScript(plugin.js[j]));
-                        }
-                        $.when.apply(null, deferreds).always(function(){
-                            t.pluginThen(plugin);
-                        });
-                    }
-                })(plugin);
             }else{
-                plugin.complete.apply(this, [false]);
+                AutomizyGlobalPlugins[pluginLocal.name].completeFunctions.push(pluginLocal.complete);
+                if(AutomizyGlobalPlugins[pluginLocal.name].completed){
+                    pluginLocal.complete.apply(pluginLocal, [false]);
+                }
+                continue;
             }
+
+            var plugin = AutomizyGlobalPlugins[pluginLocal.name];
+
+            if (plugin.skipCondition) {
+                plugin.completed = true;
+                plugin.completeFunctions[0].apply(plugin, [false]);
+                continue;
+            }
+
+            for (var j = 0; j < plugin.css.length; j++) {
+                var head = document.getElementsByTagName('head')[0];
+                var link = document.createElement('link');
+                link.rel = 'stylesheet';
+                link.type = 'text/css';
+                link.href = plugin.css[j];
+                head.appendChild(link);
+            }
+
+            hasActivePlugin = true;
+            (function (plugin) {
+                var deferreds = [];
+
+                t.d.allPluginsCount++;
+                if (plugin.js.length <= 0) {
+                    noJsPlugins.push(plugin);
+                } else {
+                    for (var j = 0; j < plugin.js.length; j++) {
+                        deferreds.push($.getScript(plugin.js[j]));
+                    }
+                    plugin.xhr = $.when.apply(null, deferreds).always(function(){
+                        t.pluginThen(plugin);
+                    });
+                }
+            })(plugin);
+
         }
 
         for(var i = 0; i < noJsPlugins.length; i++){
