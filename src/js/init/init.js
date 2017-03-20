@@ -36,7 +36,7 @@ define([], function () {
             {
                 name:'automizyJsApi',
                 skipCondition:typeof AutomizyJsApi !== 'undefined',
-                js:"/vendor/automizy-js-api/automizy.api.js"
+                js:"vendor/automizy-js-api/automizy.api.js"
             }
         ]
     });
