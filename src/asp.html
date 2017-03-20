@@ -3,6 +3,7 @@
     <meta charset="UTF-8">
     <link rel="stylesheet" type="text/css" href="asp.css">
     <script src="vendor/requirejs/require.js"></script>
+    <script src="vendor/automizy-project-initializer/automizy-project-initializer.js"></script>
     <script src="asp.js"></script>
     <script>
         window.automizyApiBaseUrl = "https://api-dev-admin.automizy.com";
@@ -10,8 +11,7 @@
         window.automizyApiRefreshPhp = "https://app-dev.automizy.com/php/refresh-local.php";
 
         require([
-            "js/core/init",
-            "js/events/ready"
+            "js/init/init"
         ], function () {
             $ASP.init().ready(function () {
 

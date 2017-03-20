@@ -11,10 +11,11 @@ set /p isConfirm=Please confirm the new module informations [y/n] (default - y)?
 
 IF NOT "%isConfirm%"=="y" GOTO EXIT0
 
-set target=..\generatedModules\%moduleName1%
+set fromDir=%cd%\
+set target=%cd%\..\generatedModules\%moduleName1%
 
 mkdir %target%
-xcopy /Y /S /Q "." "%target%"
+xxcopy /Y /S /Q "%fromDir%" "%target%"
 rmdir /S /Q %target%\node_modules
 rmdir /S /Q %target%\.bower
 rmdir /S /Q %target%\.idea
