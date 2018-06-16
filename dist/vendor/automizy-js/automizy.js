@@ -97,6 +97,32 @@ var $A = {};
         this.addClass('automizy-hide');
         return this;
     };
+    $.fn.forceShow = function () {
+        this.removeClass('automizy-force-hide');
+        return this;
+    };
+    $.fn.forceHide = function () {
+        this.addClass('automizy-force-hide');
+        return this;
+    };
+    $.fn.automizyPopover = function (data) {
+        if(typeof data === 'undefined'){
+            if(this.hasClass('automizy-popovered')){
+                return this.data('automizy-popover-data').popover;
+            }
+            this.addClass('automizy-popovered');
+            this.data('automizy-popover-data', {target:this});
+        }else{
+            data.target = this;
+            this.data('automizy-popover-data', data);
+        }
+        return this.click(function(){
+            var $t = $(this);
+            var data = $t.data('automizy-popover-data');
+            data.target = $t;
+            $A.popover(data).open();
+        });
+    };
     $.fn.serializeObject = function(addUnchecked){
         var result = {};
         var addUnchecked = addUnchecked || false;
@@ -273,6 +299,15 @@ var $A = {};
                 if (typeof t.d.hideFunction === 'undefined') {
                     t.d.hideFunction = function () {};
                 }
+                if (typeof t.d.margin === 'undefined') {
+                    t.d.margin = false;
+                }
+                if (typeof t.d.padding === 'undefined') {
+                    t.d.padding = false;
+                }
+                if (typeof t.d.background === 'undefined') {
+                    t.d.background = false;
+                }
                 if (typeof t.d.returnValue === 'undefined') {
                     t.d.returnValue = true;
                 }
@@ -299,6 +334,15 @@ var $A = {};
                 }
                 if (typeof obj.buttons === 'array' || typeof obj.buttons === 'object') {
                     t.buttons(obj.buttons);
+                }
+                if (typeof obj.margin !== 'undefined') {
+                    t.margin(obj.margin);
+                }
+                if (typeof obj.padding !== 'undefined') {
+                    t.padding(obj.padding);
+                }
+                if (typeof obj.background !== 'undefined') {
+                    t.background(obj.background);
                 }
                 if (typeof obj.target !== 'undefined') {
                     t.drawTo(obj.target);
@@ -364,6 +408,8 @@ var $A = {};
                     $elem.insertAfter(target);
                 }else if(where === 'before'){
                     $elem.insertBefore(target);
+                }else if(where === 'prepend'){
+                    $elem.prependTo(target);
                 }else{
                     $elem.appendTo(target);
                 }
@@ -394,6 +440,33 @@ var $A = {};
                 t.d.$widget.ashow();
                 t.d.showFunction.apply(t, [t, t.d.$widget]);
                 return t;
+            };
+        p.margin = p.margin || function (margin) {
+                var t = this;
+                if (typeof margin !== 'undefined') {
+                    t.d.margin = margin;
+                    t.d.$widget.css('margin', t.d.margin);
+                    return t;
+                }
+                return t.d.margin;
+            };
+        p.padding = p.padding || function (padding) {
+                var t = this;
+                if (typeof padding !== 'undefined') {
+                    t.d.padding = padding;
+                    t.d.$widget.css('padding', t.d.padding);
+                    return t;
+                }
+                return t.d.padding;
+            };
+        p.background = p.background || function (background) {
+                var t = this;
+                if (typeof background !== 'undefined') {
+                    t.d.background = background;
+                    t.d.$widget.css('background', t.d.background);
+                    return t;
+                }
+                return t.d.background;
             };
         p.hide = p.hide || function (func) {
                 var t = this;
@@ -427,6 +500,12 @@ var $A = {};
                     var parent = t.d.$widget[0].parentElement;
                     if (typeof parent !== 'undefined' && parent !== null && typeof parent.removeChild === 'function') {
                         parent.removeChild(t.d.$widget[0]);
+                    }
+                    if(typeof t.d.$dropDownMenu !== 'undefined'){
+                        parent = t.d.$dropDownMenu[0].parentElement;
+                        if (typeof parent !== 'undefined' && parent !== null && typeof parent.removeChild === 'function') {
+                            parent.removeChild(t.d.$dropDownMenu[0]);
+                        }
                     }
                 }
                 $A.setWindowScroll(true, t.id());
@@ -482,8 +561,10 @@ var $A = {};
                     return t;
                 }
                 if (typeof obj !== 'undefined') {
-                    if (obj instanceof $A.m.Button || obj instanceof $A.m.Input) {
+                    if (typeof obj.drawTo === 'function') {
                         obj.drawTo(t.d.$buttons || t.d.$widget);
+                        obj.d.thisIsVariable = true;
+                        t.d.buttons.push(obj);
                     } else {
                         obj.target = obj.target || t.d.$buttons || t.d.$widget;
                         var button = $A.newButton(obj);
@@ -520,10 +601,21 @@ var $A = {};
                 }
                 if (typeof buttons !== 'undefined') {
                     for (var i = 0; i < t.d.buttons.length; i++) {
-                        t.d.buttons[i].remove();
+                        if(t.d.buttons[i].d.thisIsVariable !== true) {
+                            t.d.buttons[i].remove();
+                        }else{
+                            t.d.buttons[i].drawTo($A.$tmp);
+                        }
                     }
-                    for (var i in buttons) {
-                        t.addButton(buttons[i]);
+                    t.d.buttons = [];
+                    if(Array.isArray(buttons)){
+                        buttons.forEach(function(button){
+                            t.addButton(button);
+                        })
+                    }else{
+                        for (var i in buttons) {
+                            t.addButton(buttons[i]);
+                        }
                     }
                     return t;
                 }
@@ -580,7 +672,8 @@ var $A = {};
         };
         p.off = function (events, name) {
             var t = this;
-            var events = events || [];
+            events = events || [];
+            name = name || false;
             if (typeof events === 'string') {
                 events = events.split(' ');
             }
@@ -588,6 +681,14 @@ var $A = {};
                 for (var i in t.f) {
                     for (var j in t.f[i]) {
                         delete t.f[i][j];
+                    }
+                }
+            }else if(name === false){
+                for (var i = 0; i < events.length; i++) {
+                    if(typeof t.f !== 'undefined' && typeof t.f[events[i]] !== 'undefined') {
+                        for (var j in t.f[events[i]]) {
+                            delete t.f[events[i]][j];
+                        }
                     }
                 }
             } else {
@@ -649,7 +750,7 @@ var $A = {};
             }
             return true;
         };
-        $A[moduleNameLowerFirst] = function (obj) {
+        $A[moduleNameLowerFirst] = $A[moduleNameLowerFirst] || function (obj) {
             if (typeof obj === 'undefined') {
                 return $A["new" + moduleName]();
             } else if (typeof obj === 'string' || typeof obj === 'number') {
@@ -678,14 +779,489 @@ var $A = {};
 })();
 
 (function(){
+    function pad (str, max) {
+        str = str.toString();
+        return str.length < max ? pad("0" + str, max) : str;
+    }
+    var index = 0;
+    $A.getUniqueString = function(){
+        var str = pad(index, 8) + '-' + (Math.random() + 1).toString(36).substring(2);
+        //if($.inArray(str, $A.d.uniques) >= 0){
+        if( $A.d.uniques.indexOf(str) > -1 ){
+            return $A.getUniqueString();
+        }
+        $A.d.uniques.push(str);
+        index++;
+        return str;
+    }
+})();
+
+(function(){
+
+    var Popover = function (obj) {
+        var t = this;
+        t.d = {
+            $widget: $('<div class="automizy-popover"></div>'),
+            $container: $('<div class="automizy-popover-container"></div>'),
+            $arrow: $('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 51.08 51.08" class="automizy-popover-arrow"><rect x="7.98" y="7.98" width="35.12" height="35.12" transform="translate(25.54 -10.58) rotate(45)" style="fill:#fff;stroke:#ccc;stroke-miterlimit:10;stroke-width:2px"/></svg>'),
+            $innerContainer: $('<div class="automizy-popover-inner-container"></div>'),
+            $title: $('<div class="automizy-popover-title"></div>'),
+            $content: $('<div class="automizy-popover-content"></div>'),
+            $buttons: $('<div class="automizy-popover-buttons"></div>'),
+
+            targetElement: false,
+            opened:false,
+            padding:'8px',
+
+            position: 'auto',
+            gravity: 'auto',
+            width: 'auto',
+            maxHeight: '800px',
+            offsetTop: 0,
+            offsetLeft: 0,
+
+            id: 'automizy-popover-' + $A.getUniqueString()
+        };
+        t.f = {};
+        t.init();
+
+        t.d.$widget.appendTo('body');
+        t.d.$container.appendTo(t.d.$widget);
+        t.d.$arrow.appendTo(t.d.$container);
+        t.d.$innerContainer.appendTo(t.d.$container);
+        t.d.$title.appendTo(t.d.$innerContainer);
+        t.d.$content.appendTo(t.d.$innerContainer);
+        t.d.$buttons.appendTo(t.d.$innerContainer);
+
+        if (typeof obj !== 'undefined') {
+            if (typeof obj.target !== 'undefined') {
+                t.targetElement(obj.target);
+            }
+            if (typeof obj.targetElement !== 'undefined') {
+                t.targetElement(obj.targetElement);
+            }
+            if (typeof obj.title !== 'undefined') {
+                t.title(obj.title);
+            }
+            if (typeof obj.width !== 'undefined') {
+                t.width(obj.width);
+            }
+            if (typeof obj.position !== 'undefined') {
+                t.position(obj.position);
+            }
+            if (typeof obj.gravity !== 'undefined') {
+                t.gravity(obj.gravity);
+            }
+            if (typeof obj.offsetTop !== 'undefined') {
+                t.offsetTop(obj.offsetTop);
+            }
+            if (typeof obj.offsetLeft !== 'undefined') {
+                t.offsetLeft(obj.offsetLeft);
+            }
+            if (typeof obj.open !== 'undefined') {
+                t.open(obj.open);
+            }
+            if (typeof obj.content !== 'undefined') {
+                t.content(obj.content);
+            }
+            if (typeof obj.padding !== 'undefined') {
+                t.padding(obj.padding);
+            }
+            t.initParameter(obj);
+        }
+
+    };
+
+    var p = Popover.prototype;
+
+
+    p.targetElement = p.target = function (targetElement) {
+        var t = this;
+        if (typeof targetElement !== 'undefined') {
+            if (typeof targetElement === 'string' || typeof targetElement === 'number') {
+                targetElement = $('#' + targetElement);
+            }
+            t.d.targetElement = $(targetElement);
+            t.d.targetElement.addClass('automizy-popovered');
+            return t;
+        }
+        return t.d.targetElement;
+    };
+    p.appendTo = function (appendTo) {
+        var t = this;
+        if (typeof appendTo !== 'undefined') {
+            t.d.appendTo = appendTo;
+            t.d.$widget.appendTo(t.d.appendTo);
+            return t;
+        }
+        return t.d.appendTo;
+    };
+    p.width = function (width) {
+        var t = this;
+        if (typeof width !== 'undefined') {
+            t.d.width = width;
+            t.d.$widget.width(width);
+            return t;
+        }
+        return t.d.width;
+    };
+    p.maxHeight = function (maxHeight) {
+        var t = this;
+        if (typeof maxHeight !== 'undefined') {
+            t.d.maxHeight = maxHeight;
+            t.d.$widget.css('max.height', maxHeight);
+            return t;
+        }
+        return t.d.maxHeight;
+    };
+    p.position = function (position) {
+        var t = this;
+        if (typeof position !== 'undefined') {
+            t.d.position = position;
+            return t;
+        }
+        return t.d.position;
+    };
+    p.gravity = function (gravity) {
+        var t = this;
+        if (typeof gravity !== 'undefined') {
+            t.d.gravity = gravity;
+            return t;
+        }
+        return t.d.gravity;
+    };
+    p.offsetTop = function (offsetTop) {
+        var t = this;
+        if (typeof offsetTop !== 'undefined') {
+            t.d.offsetTop = parseInt(offsetTop) || 0;
+            return t;
+        }
+        return t.d.offsetTop;
+    };
+    p.offsetLeft = function (offsetLeft) {
+        var t = this;
+        if (typeof offsetLeft !== 'undefined') {
+            t.d.offsetLeft = parseInt(offsetLeft) || 0;
+            return t;
+        }
+        return t.d.offsetLeft;
+    };
+
+    p.title = function (title) {
+        var t = this;
+        if (typeof title !== 'undefined') {
+            t.d.title = title;
+            if (t.d.title === false) {
+                t.d.$title.prependTo($A.$tmp);
+            } else {
+                t.d.$title.html(t.d.title);
+                //t.d.$title.prependTo(t.d.$widget);
+            }
+            return t;
+        }
+        return t.d.title;
+    };
+    p.padding = function (padding) {
+        var t = this;
+        if (typeof padding !== 'undefined') {
+            t.d.padding = padding;
+            t.d.$content.css('padding', padding);
+            return t;
+        }
+        return t.d.padding;
+    };
+
+    p.content = function (content) {
+        var t = this;
+        if (typeof content !== 'undefined') {
+            if (t.d.$content.contents() instanceof jQuery) {
+                t.d.$content.contents().appendTo($A.$tmp);
+            }
+            t.d.$content.empty();
+            t.d.content = content;
+            if (t.d.content instanceof jQuery) {
+                t.d.content.appendTo(t.d.$content);
+            } else if (typeof t.d.content.drawTo === 'function') {
+                t.d.content.drawTo(t.d.$content);
+            } else {
+                t.d.$content.html(t.d.content);
+            }
+            t.loadingOff();
+            return t;
+        }
+        return t.d.content;
+    };
+
+    p.loadingOn = p.loadingStart = function () {
+        var t = this;
+        t.widget().addClass('automizy-loading');
+        return t;
+    };
+    p.loadingOff = p.loadingStop = function () {
+        var t = this;
+        t.widget().removeClass('automizy-loading');
+        return t;
+    };
+
+    p.open = function (func, name, life) {
+        var t = this;
+        if (typeof func === 'function') {
+            t.addFunction.apply(t, ['open', func, name, life]);
+            return t;
+        }
+        t.d.opened = true;
+        t.widget().ashow();
+        t.setPosition();
+        t.runFunctions('open');
+        return t;
+    };
+    p.close = function () {
+        var t = this;
+        t.d.opened = false;
+        t.widget().ahide();
+        return t;
+    };
+    p.toggle = function () {
+        var t = this;
+        if(t.d.opened){
+            t.close();
+        }else{
+            t.open();
+        }
+        return t;
+    };
+    p.setPosition = function () {
+        var t = this;
+
+        if(!t.d.opened){
+            return t;
+        }
+
+        var position = t.position();
+        var gravity = t.gravity();
+        var targetOffset = t.targetElement().offset();
+        var targetOffsetTop = targetOffset.top + t.offsetTop();
+        var targetOffsetLeft = targetOffset.left + t.offsetLeft();
+        var targetHeight = t.targetElement().outerHeight();
+        var targetWidth = t.targetElement().outerWidth();
+        var windowHeight = window.innerHeight;
+        var windowWidth = window.innerWidth;
+        var popoverHeight = t.widget().height();
+        var popoverWidth = t.widget().outerWidth();
+        var boxCss = {
+            bottom: 'auto',
+            left: 'auto',
+            right: 'auto',
+            top: 'auto'
+        };
+        var arrowCss = {
+            bottom: 'auto',
+            left: 'auto',
+            right: 'auto',
+            top: 'auto'
+        };
+
+        if (position === 'auto') {
+            if (targetOffsetTop + targetHeight + popoverHeight >= windowHeight) {
+                position = 'top';
+            } else {
+                position = 'bottom';
+            }
+        }
+        if (gravity === 'auto') {
+            if (position === 'top' || position === 'bottom') {
+                gravity = 'left';
+            } else {
+                gravity = 'top';
+            }
+        }
+
+        if (position === 'top') {
+            boxCss = {
+                bottom: (windowHeight - targetOffsetTop) + 'px',
+                left: targetOffsetLeft + 'px',
+                right: 'auto',
+                top: 'auto'
+            };
+            arrowCss = {
+                bottom: '-10px',
+                left: '10px',
+                right: 'auto',
+                top: 'auto'
+            };
+        } else if (position === 'bottom') {
+            boxCss.top = (targetOffsetTop + targetHeight) + 'px';
+            arrowCss.top = '-10px';
+            if (gravity === 'right') {
+                boxCss.right = windowWidth - targetOffsetLeft - targetWidth + 'px';
+                arrowCss.right = '10px';
+            } else {
+                boxCss.left = targetOffsetLeft + 'px';
+                arrowCss.left = '10px';
+            }
+        } else if (position === 'left') {
+            boxCss = {
+                bottom: 'auto',
+                left: 'auto',
+                right: windowWidth - targetOffsetLeft + 11 + 'px',
+                top: targetOffsetTop - 17 + 'px'
+            };
+            arrowCss = {
+                bottom: 'auto',
+                left: 'auto',
+                right: '-10px',
+                top: '10px'
+            };
+        } else if (position === 'right') {
+            boxCss = {
+                bottom: 'auto',
+                left: 'auto',
+                right: windowWidth - targetOffsetLeft + 11 + 'px',
+                top: targetOffsetTop - 17 + 'px'
+            };
+            arrowCss = {
+                bottom: 'auto',
+                left: 'auto',
+                right: '-10px',
+                top: '10px'
+            };
+        }
+
+        t.widget().css(boxCss);
+        t.d.$arrow.css(arrowCss);
+
+        return t;
+    };
+    p.reset = function () {
+        var t = this;
+
+        t.targetElement(false);
+        t.position('auto');
+        t.gravity('auto');
+        t.width('auto');
+        t.maxHeight('800px');
+        t.content('');
+        t.offsetTop(0);
+        t.offsetLeft(0);
+        t.buttons([]);
+
+        return t;
+    };
+
+    $A.popover = function (obj) {
+        if (typeof obj === 'undefined') {
+            return $A.globalPopoverModule;
+        }
+
+        if (typeof obj.popover === 'undefined') {
+            obj.popover = $A.globalPopoverModule;
+        }
+        obj.popover.targetElement(obj.targetElement || obj.target);
+
+        if (typeof obj.title !== 'undefined') {
+            obj.popover.title(obj.title);
+        } else {
+            obj.popover.title('');
+        }
+
+        if (typeof obj.content !== 'undefined') {
+            obj.popover.content(obj.content);
+        } else {
+            obj.popover.content('');
+        }
+
+        if (typeof obj.buttons !== 'undefined') {
+            obj.popover.buttons(obj.buttons);
+        } else {
+            obj.popover.buttons([]);
+        }
+
+        if (typeof obj.width !== 'undefined') {
+            obj.popover.width(obj.width);
+        } else {
+            obj.popover.width('auto');
+        }
+
+        if (typeof obj.position !== 'undefined') {
+            obj.popover.position(obj.position);
+        } else {
+            obj.popover.position('auto');
+        }
+
+        if (typeof obj.gravity !== 'undefined') {
+            obj.popover.gravity(obj.gravity);
+        } else {
+            obj.popover.gravity('auto');
+        }
+
+        if (typeof obj.offsetTop !== 'undefined') {
+            obj.popover.offsetTop(obj.offsetTop);
+        } else {
+            obj.popover.offsetTop(0);
+        }
+
+        if (typeof obj.offsetLeft !== 'undefined') {
+            obj.popover.offsetLeft(obj.offsetLeft);
+        } else {
+            obj.popover.offsetLeft(0);
+        }
+
+        if (typeof obj.padding !== 'undefined') {
+            obj.popover.padding(obj.padding);
+        } else {
+            obj.popover.padding('8px');
+        }
+
+        if (typeof obj.appendTo !== 'undefined') {
+            obj.popover.appendTo(obj.appendTo);
+        } else {
+            obj.popover.appendTo('body');
+        }
+
+        obj.popover.off('open');
+        if (typeof obj.open === 'function') {
+            obj.popover.on('open', obj.open);
+        }
+
+
+        return obj.popover;
+
+    };
+
+
+    $A.initBasicFunctions(Popover, "Popover", ['open', 'close']);
+
+    $A.globalPopoverModule = $A.newPopover();
+    $A.globalPopoverModule.close();
+
+    $A.closeAllPopover = function () {
+        var popovers = $A.getAllPopover();
+        for (var i in popovers) {
+            popovers[i].close();
+        }
+    };
+
+    $(document).on('mouseup', function (event) {
+        if (!$(event.target).closest('.automizy-popover, .automizy-popovered, .ui-datepicker').length) {
+            $A.closeAllPopover();
+        }
+    });
+
+})();
+
+(function(){
     var Button = function (obj) {
         var t = this;
         t.d = {
-            $widget: $('<span class="automizy-button"></span>'),
-            $widgetButton: $('<a href="javascript:;"></a>'),
+            $widget: $('<span class="automizy-button automizy-button-uppercase"></span>'),
+            $buttonBox: $('<span class="automizy-button-box"></span>'),
+            $widgetButton: $('<a href="javascript:;" class="automizy-button-a"></a>'),
             $text: $('<span class="automizy-button-text"></span>'),
             $icon: $('<span class="automizy-button-icon"></span>'),
             $badge: $('<span class="automizy-button-badge"></span>'),
+            $dropDownButton:$('<a href="javascript:;" class="automizy-button-dropdown-button"></a>'),
+            $dropDownButtonIcon:$('<span class="fa fa-caret-down"></span>'),
+            $dropDownMenu:$('<span class="automizy-button-dropdown-menu"></span>'),
             iconPosition: 'left',
             text: 'My Button',
             title: '',
@@ -697,24 +1273,37 @@ var $A = {};
             newRow: false,
             disabled: false,
             filePicker: false,
+            uppercase:true,
             badge: {
                 active: false
             },
             triggers: {
                 click: 0
             },
-            create: function () {
-            },
+            dropDownMenuOpened:false,
+            dropDownMenuList:[],
+            create: function () {},
+            openDropDownMenuFunction: function () {},
             id: 'automizy-button-' + $A.getUniqueString()
         };
         t.f = {};
         t.init();
 
-        t.d.$widgetButton.appendTo(t.d.$widget);
+        t.d.$buttonBox.appendTo(t.d.$widget);
+        t.d.$widgetButton.appendTo(t.d.$buttonBox);
+        t.d.$dropDownMenu.appendTo('body');
         t.d.$badge.appendTo(t.d.$widgetButton).hide();
         t.d.$icon.appendTo(t.d.$widgetButton);
         t.d.$text.appendTo(t.d.$widgetButton);
         t.d.$text.text(t.d.text);
+        t.d.$dropDownButton.click(function(event){
+            if(t.d.dropDownMenuOpened){
+                $A.closeAllButtonMenu();
+            }else {
+                t.openDropDownMenu();
+            }
+        });
+        t.d.$dropDownButtonIcon.appendTo(t.d.$dropDownButton);
         t.d.$widget.addClass('automizy-skin-' + t.d.skin).attr('id', t.id());
         t.d.$widgetButton.click(function () {
             if (t.click().returnValue() === false) {
@@ -740,6 +1329,15 @@ var $A = {};
             if (typeof obj.margin !== 'undefined') {
                 t.margin(obj.margin);
             }
+            if (typeof obj.padding !== 'undefined') {
+                t.padding(obj.padding);
+            }
+            if (typeof obj.fontSize !== 'undefined') {
+                t.fontSize(obj.fontSize);
+            }
+            if (typeof obj.background !== 'undefined') {
+                t.background(obj.background);
+            }
             if (typeof obj.href !== 'undefined') {
                 t.href(obj.href);
             }
@@ -764,6 +1362,12 @@ var $A = {};
             if (typeof obj.thick !== 'undefined') {
                 t.thick(obj.thick);
             }
+            if (typeof obj.semiThick !== 'undefined') {
+                t.semiThick(obj.semiThick);
+            }
+            if (typeof obj.uppercase !== 'undefined') {
+                t.uppercase(obj.uppercase);
+            }
             if (typeof obj.icon !== 'undefined') {
                 t.icon(obj.icon);
             }
@@ -781,6 +1385,15 @@ var $A = {};
             }
             if (typeof obj.filePicker !== 'undefined') {
                 t.filePicker(obj.filePicker);
+            }
+            if (typeof obj.filePickerChange !== 'undefined') {
+                t.filePickerChange(obj.filePickerChange);
+            }
+            if (typeof obj.dropdown !== 'undefined') {
+                t.dropdown(obj.dropdown);
+            }
+            if (typeof obj.openDropDownMenu !== 'undefined') {
+                t.openDropDownMenu(obj.openDropDownMenu);
             }
             t.initParameter(obj);
         }
@@ -839,8 +1452,7 @@ var $A = {};
         if (typeof width !== 'undefined') {
             t.d.width = width;
             t.d.$widget.width(width);
-            t.d.$widgetButton.width('100%');
-            t.d.$widgetButton.css('width', '100%');
+            t.widget().addClass('automizy-custom-width');
             return t;
         }
         return t.d.width;
@@ -853,6 +1465,33 @@ var $A = {};
             return t;
         }
         return t.d.margin;
+    };
+    p.padding = function (padding) {
+        var t = this;
+        if (typeof padding !== 'undefined') {
+            t.d.padding = padding;
+            t.d.$widgetButton.css('padding', t.d.padding);
+            return t;
+        }
+        return t.d.padding;
+    };
+    p.fontSize = function (fontSize) {
+        var t = this;
+        if (typeof fontSize !== 'undefined') {
+            t.d.fontSize = fontSize;
+            t.d.$widgetButton.css('fontSize', t.d.fontSize);
+            return t;
+        }
+        return t.d.fontSize;
+    };
+    p.background = function (background) {
+        var t = this;
+        if (typeof background !== 'undefined') {
+            t.d.background = background;
+            t.d.$widgetButton.css('background', t.d.background);
+            return t;
+        }
+        return t.d.background;
     };
     p.href = function (href) {
         var t = this;
@@ -989,6 +1628,30 @@ var $A = {};
         t.widget().addClass('automizy-button-thick');
         return t;
     };
+    p.semiThick = function (value) {
+        var t = this;
+        if (typeof value !== 'undefined') {
+            value = $A.parseBoolean(value);
+            if (!value) {
+                t.widget().removeClass('automizy-button-semithick');
+                return t;
+            }
+        }
+        t.widget().addClass('automizy-button-semithick');
+        return t;
+    };
+    p.uppercase = function (value) {
+        var t = this;
+        if (typeof value !== 'undefined') {
+            value = $A.parseBoolean(value);
+            if (!value) {
+                t.widget().removeClass('automizy-button-uppercase');
+                return t;
+            }
+        }
+        t.widget().addClass('automizy-button-uppercase');
+        return t;
+    };
 
     p.badge = function (badge) {
         var t = this;
@@ -1104,7 +1767,11 @@ var $A = {};
 
                 if(filePicker){
                     var $input = $('<input class="automizy-button-fileupload-input" type="file">');
-                    $input.appendTo(t.d.$widgetButton);
+                    $input.appendTo(t.d.$widgetButton).change(function () {
+                        if (t.filePickerChange().returnValue() === false) {
+                            return false;
+                        }
+                    });
                     t.data('input',$input);
                 }
                 else {
@@ -1119,10 +1786,107 @@ var $A = {};
         }
         return t.d.filePicker;
     };
+    p.filePickerChange = function (func, name, life) {
+        var t = this;
+        if (typeof func === 'function') {
+            t.addFunction('filePickerChange', func, name, life);
+        } else {
+            if (t.disabled()) {
+                return t;
+            }
+            var $input;
+            if(typeof t.data('input') !== "undefined"){
+                $input = t.data('input');
+            }else{
+                $input = $();
+            }
+            var a = t.runFunctions('filePickerChange', t, [t, $input]);
+            t.returnValue(!(a[0] === false || a[1] === false));
+        }
+        return t;
+    };
+
+    p.dropdown = function (dropdownList) {
+        var t = this;
+        if (typeof dropdownList !== "undefined") {
+            t.widget().addClass('automizy-has-dropdown');
+            t.d.$dropDownButton.appendTo(t.d.$buttonBox);
+            for(var i = 0; i < dropdownList.length; i++){
+                if(dropdownList[i] === 'divider'){
+                    t.d.$dropDownMenu.append('<div class="automizy-button-dropdown-menu-divider"></div>');
+                }else {
+                    dropdownList[i].bold = dropdownList[i].bold || false;
+                    dropdownList[i].click = dropdownList[i].click || function () {};
+                    dropdownList[i].$item = $('<div class="automizy-button-dropdown-menu-item"></div>').html(dropdownList[i].text).appendTo(t.d.$dropDownMenu).data('automizy-dropdown-list-element', dropdownList[i]).click(function(){
+                        var $item = $(this);
+                        var listElement = $item.data('automizy-dropdown-list-element');
+                        $A.closeAllButtonMenu();
+                        listElement.click.apply(t, [listElement]);
+                    });
+                    if (dropdownList[i].bold) {
+                        dropdownList[i].$item.css('font-weight', 'bold');
+                    }
+                }
+            }
+            t.d.dropdown = dropdownList;
+            return t;
+        }
+        return t.d.dropdown;
+    };
+    p.openDropDownMenu = function(func){
+        var t = this;
+        if(typeof func === 'function'){
+            t.d.openDropDownMenuFunction = func;
+            return t;
+        }
+        $A.closeAllButtonMenu();
+        t.d.dropDownMenuOpened = true;
+        var $target = t.widget();
+        var targetOffset = $target.offset();
+        var targetOffsetTop = targetOffset.top;
+        var targetOffsetLeft = targetOffset.left;
+        var targetHeight = $target.height();
+        var targetWidth = $target.outerWidth();
+        t.d.$dropDownMenu.css({
+            bottom: 'auto',
+            left: targetOffsetLeft + 'px',
+            top: (targetOffsetTop + targetHeight) + 'px',
+            width: targetWidth + 'px',
+            display: 'block'
+        });
+        t.d.openDropDownMenuFunction.apply(t, []);
+        return t;
+    };
 
 
-    $A.initBasicFunctions(Button, "Button", ['click']);
+    $A.initBasicFunctions(Button, "Button", ['click', 'filePickerChange']);
 
+
+
+    $A.closeAllButtonMenu = function(){
+        var buttons = $A.getAllButton();
+        for(var i in buttons){
+            buttons[i].d.$dropDownMenu.css('display', 'none');
+            buttons[i].d.dropDownMenuOpened = false;
+        }
+    };
+
+    $A.globalButtonPopoverModule = $A.newPopover();
+    $A.globalButtonPopoverModule.close();
+
+    $(window).on('resize', function(){
+        $A.closeAllButtonMenu();
+    });
+    $(document).on('click', function(event) {
+        if(!$(event.target).closest('.automizy-button-dropdown-menu, .automizy-button-dropdown-button').length) {
+            $A.closeAllButtonMenu();
+        }
+    });
+    $(document).on('mousewheel DOMMouseScroll', function(event) {
+        if(!$(event.target).closest('.automizy-button-dropdown-menu').length) {
+            $A.closeAllButtonMenu();
+        }
+    });
 
 })();
 
@@ -1268,6 +2032,18 @@ var $A = {};
             enumerable: false
         });
     }
+    if(typeof Array.prototype.pushUnique === 'undefined') {
+        Object.defineProperty(Array.prototype, "pushUnique", {
+            value: function (item) {
+                if(this.indexOf(item) === -1) {
+                    this.push(item);
+                    return true;
+                }
+                return false;
+            },
+            enumerable: false
+        });
+    }
 })();
 
 (function(){
@@ -1323,24 +2099,6 @@ var $A = {};
 })();
 
 (function(){
-    function pad (str, max) {
-        str = str.toString();
-        return str.length < max ? pad("0" + str, max) : str;
-    }
-    var index = 0;
-    $A.getUniqueString = function(){
-        var str = pad(index, 8) + '-' + (Math.random() + 1).toString(36).substring(2);
-        //if($.inArray(str, $A.d.uniques) >= 0){
-        if( $A.d.uniques.indexOf(str) > -1 ){
-            return $A.getUniqueString();
-        }
-        $A.d.uniques.push(str);
-        index++;
-        return str;
-    }
-})();
-
-(function(){
     $A.runFunctions = function(functions, functionThis, functionParameters){
         var returnValue = true;
         if($.isArray(functions)) {
@@ -1382,13 +2140,15 @@ var $A = {};
             maxWidth: '100%',
             minWidth: '250px',
             minHeight: '0px',
+            contentPadding:'15px',
             zIndex: 2501,
             isClose: true,
             hasObject: false,
             hash: false,
             openable: true,
             closable: true,
-            buttonsBox: true,
+            displayButtons: true,
+            displayHeader: true,
             clickOutClose: false,
             id: 'automizy-dialog-' + $A.getUniqueString(),
             openFunctions: [],
@@ -1430,6 +2190,9 @@ var $A = {};
             if (typeof obj.displayHeader !== 'undefined') {
                 t.displayHeader(obj.displayHeader);
             }
+            if (typeof obj.displayButtons !== 'undefined') {
+                t.displayButtons(obj.displayButtons);
+            }
             if (typeof obj.positionX !== 'undefined') {
                 t.positionX(obj.positionX);
             }
@@ -1442,9 +2205,6 @@ var $A = {};
             if (typeof obj.width !== 'undefined') {
                 t.width(obj.width);
             }
-            if (typeof obj.maxWidth !== 'undefined') {
-                t.maxWidth(obj.maxWidth);
-            }
             if (typeof obj.minWidth !== 'undefined') {
                 t.minWidth(obj.minWidth);
             }
@@ -1453,6 +2213,9 @@ var $A = {};
             }
             if (typeof obj.minHeight !== 'undefined') {
                 t.minHeight(obj.minHeight);
+            }
+            if (typeof obj.contentPadding !== 'undefined') {
+                t.contentPadding(obj.contentPadding);
             }
             if (typeof obj.zIndex !== 'undefined') {
                 t.zIndex(obj.zIndex);
@@ -1503,13 +2266,28 @@ var $A = {};
         if (typeof displayHeader !== 'undefined') {
             t.d.displayHeader = $A.parseBoolean(displayHeader);
             if (t.d.displayHeader) {
-                t.d.$head.hide();
+                t.d.$head.ashow();
+                t.d.$close.ashow();
             } else {
-                t.d.$head.hide();
+                t.d.$head.ahide();
+                t.d.$close.ahide();
             }
             return t;
         }
         return t.d.displayHeader;
+    };
+    p.displayButtons = p.buttonsBox = function (displayButtons) {
+        var t = this;
+        if (typeof displayButtons !== 'undefined') {
+            t.d.displayButtons = $A.parseBoolean(displayButtons);
+            if (t.d.displayButtons) {
+                t.d.$buttons.ashow();
+            } else {
+                t.d.$buttons.ahide();
+            }
+            return t;
+        }
+        return t.d.displayButtons;
     };
     p.hash = function (hash) {
         var t = this;
@@ -1518,17 +2296,6 @@ var $A = {};
             return t;
         }
         return t.d.hash;
-    };
-    p.buttonsBox = function (buttonsBox) {
-        var t = this;
-        if (typeof buttonsBox !== 'undefined') {
-            t.d.buttonsBox = $A.parseBoolean(buttonsBox);
-            if (!t.d.buttonsBox) {
-                t.d.$buttons.hide();
-            }
-            return t;
-        }
-        return t.d.buttonsBox;
     };
     p.content = function (content) {
         var t = this;
@@ -1643,6 +2410,15 @@ var $A = {};
         }
         return t.d.minHeight;
     };
+    p.contentPadding = function (contentPadding) {
+        var t = this;
+        if (typeof contentPadding !== 'undefined') {
+            t.d.contentPadding = contentPadding;
+            t.d.$content.css('padding', contentPadding);
+            return t;
+        }
+        return t.d.contentPadding;
+    };
     p.zIndex = function (zIndex) {
         var t = this;
         if (typeof zIndex !== 'undefined' && Number(zIndex) === zIndex && zIndex % 1 === 0) {
@@ -1665,7 +2441,7 @@ var $A = {};
     p.setMaxHeight = function () {
         var t = this;
         var buttonBoxHeight = 0;
-        if (t.buttonsBox()) {
+        if (t.displayButtons()) {
             buttonBoxHeight = t.d.$buttons.outerHeight();
         }
         var maxHeight = $(window).height() - buttonBoxHeight - t.d.$head.outerHeight();
@@ -2732,10 +3508,11 @@ var $A = {};
                     return false;
                 }
                 if(t.type() === 'number'){
-                    if(t.max() !== false && t.val() > t.max()){
+                    var value = parseInt(t.val());
+                    if(t.max() !== false && value > t.max()){
                         t.val(t.max());
                     }
-                    if(t.min() !== false && t.val() < t.min()){
+                    if(t.min() !== false && value < t.min()){
                         t.val(t.min());
                     }
                 }
@@ -3866,13 +4643,22 @@ var $A = {};
 
             $errorBox: $('<div class="automizy-input2-error-box"></div>'),
             $buttonBottomBox: $('<div class="automizy-input2-bottom-button-box automizy-hide"></div>'),
+            $contentBottomBox: $('<div class="automizy-input2-bottom-content-box automizy-hide"></div>'),
             $labelBottomBox: $('<div class="automizy-input2-bottom-label-box automizy-hide"></div>'),
 
             $labelTop: $('<label class="automizy-input2-label-top"></label>'),
             $labelBefore: $('<label class="automizy-input2-label-before"></label>'),
             $input: $('<input type="text" class="automizy-input2-input" />'),
-            $colorPickerInput: $('<input type="color" class="automizy-input2-colorpicker-input" />'),
-            $loading: $('<div class="automizy-input2-loading"><div class="automizy-spinner"><div class="automizy-bounce1"></div><div class="automizy-bounce2"></div><div class="automizy-bounce3"></div></div></div>'),
+            $inputInnerIconLeft: $('<span class="automizy-input2-input-inner-icon-left"></span>'),
+            $inputInnerIconRight: $('<span class="automizy-input2-input-inner-icon-right"></span>'),
+            $colorPickerInput: $('<input type="color" class="automizy-input2-colorpicker-input" />').change(function(){
+                var value = $(this).val();
+                t.data('colorpickerValue', value);
+                if(t.d.connectColorPickerToInputField){
+                    t.val(value);
+                }
+                t.colorPickerChange();
+            }),
             $labelAfter: $('<label class="automizy-input2-label-after"></label>'),
             $helpIcon: $('<span class="automizy-input2-help fa fa-question-circle"></span>'),
             $labelBottom: $('<label class="automizy-input2-label-bottom"></label>'),
@@ -3896,28 +4682,33 @@ var $A = {};
             buttonRight: false,
             buttonTop: false,
             buttonBottom: false,
+            contentBottom: false,
             tabindex: false,
+            activeAutomizyChange:false,
             labelBeforeWidth: '',
             value: '',
             placeholder: '',
             name: '',
+            inputWidth:'auto',
             width: '100%',
             labelTop: '',
             labelBefore: '',
             labelAfter: '',
             labelBottom: '',
             accept: [],
-            attachColorPicker: false,
+            colorPickerEnabled: false,
             enableCustomSpinner: false,
             validate: function () {
             },
             validationEvents: '',
             createFunctions: [],
             automizySelect: false,
+            automizyRadio: false,
             inlineEditable: false,
             id: 'automizy-input-' + $A.getUniqueString(),
             inputId: 'automizy-input-' + $A.getUniqueString() + '-input',
-            change: function () { //change keyup paste
+            colorPickerChange:function(){},
+            change: function () {
                 if (t.change().returnValue() === false) {
                     return false;
                 }
@@ -3959,6 +4750,7 @@ var $A = {};
         t.d.$inputCellShadow.appendTo(t.d.$bottomRow);
         t.d.$errorBox.appendTo(t.d.$inputCellShadow);
         t.d.$buttonBottomBox.appendTo(t.d.$inputCellShadow);
+        t.d.$contentBottomBox.appendTo(t.d.$inputCellShadow);
 
         t.d.$labelBottomBox.appendTo(t.d.$widget);
 
@@ -3966,7 +4758,8 @@ var $A = {};
         t.d.$labelTop.appendTo(t.d.$labelTopBox).attr('for', t.d.inputId);
         t.d.$labelBefore.appendTo(t.d.$labelBeforeBox).attr('for', t.d.inputId);
         t.d.$input.appendTo(t.d.$inputCell).attr('id', t.d.inputId);
-        t.d.$loading.appendTo(t.d.$loadingCell);
+        t.d.$inputInnerIconLeft.appendTo(t.d.$inputCell);
+        t.d.$inputInnerIconRight.appendTo(t.d.$inputCell);
         t.d.$labelAfter.appendTo(t.d.$labelAfterCell).attr('for', t.d.inputId);
         t.d.$helpIcon.appendTo(t.d.$helpIconCell);
         t.d.$labelBottom.appendTo(t.d.$labelBottomBox).attr('for', t.d.inputId);
@@ -3990,6 +4783,12 @@ var $A = {};
             if (typeof obj.type !== 'undefined') {
                 t.type(obj.type);
             }
+            if (typeof obj.min !== 'undefined') {
+                t.min(obj.min);
+            }
+            if (typeof obj.max !== 'undefined') {
+                t.max(obj.max);
+            }
             if (typeof obj.disable !== 'undefined') {
                 if (obj.disable) {
                     t.disable();
@@ -4007,8 +4806,17 @@ var $A = {};
             if (typeof obj.checked !== 'undefined') {
                 t.checked(obj.checked);
             }
-            if (typeof obj.attachColorPicker !== 'undefined') {
-                t.attachColorPicker(obj.attachColorPicker);
+            if (typeof obj.colorPickerEnabled !== 'undefined') {
+                t.colorPickerEnabled(obj.colorPickerEnabled);
+            }
+            if (typeof obj.colorPickerValue !== 'undefined') {
+                t.colorPickerValue(obj.colorPickerValue);
+            }
+            if (typeof obj.colorPickerChange === 'function') {
+                t.colorPickerChange(obj.colorPickerChange);
+            }
+            if (typeof obj.connectColorPickerToInputField !== 'undefined') {
+                t.connectColorPickerToInputField(obj.connectColorPickerToInputField);
             }
             if (typeof obj.enableCustomSpinner !== 'undefined') {
                 t.enableCustomSpinner(obj.enableCustomSpinner);
@@ -4024,6 +4832,9 @@ var $A = {};
             }
             if (typeof obj.margin !== 'undefined') {
                 t.margin(obj.margin);
+            }
+            if (typeof obj.padding !== 'undefined') {
+                t.padding(obj.padding);
             }
             if (typeof obj.name !== 'undefined') {
                 t.name(obj.name);
@@ -4049,6 +4860,9 @@ var $A = {};
             if (typeof obj.width !== 'undefined') {
                 t.width(obj.width);
             }
+            if (typeof obj.inputWidth !== 'undefined') {
+                t.inputWidth(obj.inputWidth);
+            }
             if (typeof obj.breakInput !== 'undefined') {
                 t.breakInput(obj.breakInput);
             }
@@ -4070,11 +4884,11 @@ var $A = {};
             if (typeof obj.enter === 'function') {
                 t.enter(obj.enter);
             }
-            if (typeof obj.focus === 'function') {
-                t.focus(obj.focus);
-            }
             if (typeof obj.blur === 'function') {
                 t.blur(obj.blur);
+            }
+            if (typeof obj.automizyChange === 'function') {
+                t.automizyChange(obj.automizyChange);
             }
             if (typeof obj.disabled === 'boolean') {
                 t.disabled(obj.disabled);
@@ -4109,6 +4923,9 @@ var $A = {};
             if (typeof obj.buttonBottom !== 'undefined') {
                 t.buttonBottom(obj.buttonBottom);
             }
+            if (typeof obj.contentBottom !== 'undefined') {
+                t.contentBottom(obj.contentBottom);
+            }
             if (typeof obj.iconLeft !== 'undefined') {
                 t.iconLeft(obj.iconLeft);
             }
@@ -4121,8 +4938,23 @@ var $A = {};
             if (typeof obj.iconRightClick === 'function') {
                 t.iconRightClick(obj.iconRightClick);
             }
+            if (typeof obj.innerIconLeft !== 'undefined') {
+                t.innerIconLeft(obj.innerIconLeft);
+            }
+            if (typeof obj.innerIconLeftClick === 'function') {
+                t.innerIconLeftClick(obj.innerIconLeftClick);
+            }
+            if (typeof obj.innerIconRight !== 'undefined') {
+                t.innerIconRight(obj.innerIconRight);
+            }
+            if (typeof obj.innerIconRightClick === 'function') {
+                t.innerIconRightClick(obj.innerIconRightClick);
+            }
             if (typeof obj.automizySelect !== 'undefined') {
                 t.d.automizySelect = obj.automizySelect;
+            }
+            if (typeof obj.automizyRadio !== 'undefined') {
+                t.d.automizyRadio = obj.automizyRadio;
             }
             if (typeof obj.labelAfter !== 'undefined') {
                 t.labelAfter(obj.labelAfter);
@@ -4154,6 +4986,10 @@ var $A = {};
         if (t.d.automizySelect) {
             t.automizySelect();
         }
+        //initializing automizyRadio if necessary
+        if (t.d.automizyRadio) {
+            t.automizyRadio();
+        }
 
 
     };
@@ -4182,7 +5018,19 @@ var $A = {};
             if (t.click().returnValue() === false) {
                 return false;
             }
-        });
+        }).on('keyup change click mousewheel', function () {
+            if(t.d.activeAutomizyChange) {
+                (function(input, module){
+                    setTimeout(function () {
+                        var $input = $(input);
+                        if ($input.data('old-value') !== input.value) {
+                            $input.data('old-value', input.value);
+                            module.automizyChange.apply(module, [input]);
+                        }
+                    }, 1)
+                })(this, t);
+            }
+        }).data('old-value', t.d.$input[0].value);
     };
     p.disabled = function (disabled) {
         var t = this;
@@ -4193,6 +5041,22 @@ var $A = {};
             return t;
         }
         return t.d.disabled;
+    };
+    p.max = function (max) {
+        var t = this;
+        if (typeof max !== 'undefined') {
+            t.input().attr('max', max);
+            return t;
+        }
+        return t.input().attr('max');
+    };
+    p.min = function (min) {
+        var t = this;
+        if (typeof min !== 'undefined') {
+            t.input().attr('min', min);
+            return t;
+        }
+        return t.input().attr('min');
     };
     p.enter = function (func, name, life) {
         var t = this;
@@ -4206,11 +5070,19 @@ var $A = {};
     };
     p.change = function (func, name, life) {
         var t = this;
+        if (t.type() === 'radio') {
+            var radio = t.automizyRadio();
+            radio.change.apply(radio, arguments || []);
+            return t;
+        }
         if (typeof func === 'function') {
             t.addFunction('change', func, name, life);
         } else {
             var a = t.runFunctions('change');
             t.returnValue(!(t.disabled() === true || a[0] === false || a[1] === false));
+            if(t.d.connectColorPickerToInputField){
+                t.colorPickerValue(t.val());
+            }
         }
         return t;
     };
@@ -4234,6 +5106,11 @@ var $A = {};
         }
         return t;
     };
+    p.select = function () {
+        var t = this;
+        t.input().select();
+        return t;
+    };
     p.blur = function (func, name, life) {
         var t = this;
         if (typeof func === 'function') {
@@ -4250,6 +5127,17 @@ var $A = {};
             t.addFunction('click', func, name, life);
         } else {
             var a = t.runFunctions('click');
+            t.returnValue(!(t.disabled() === true || a[0] === false || a[1] === false));
+        }
+        return t;
+    };
+    p.automizyChange = function(func, name, life){
+        var t = this;
+        if (typeof func === 'function') {
+            t.addFunction('automizyChange', func, name, life);
+            t.d.activeAutomizyChange = true;
+        } else {
+            var a = t.runFunctions('automizyChange');
             t.returnValue(!(t.disabled() === true || a[0] === false || a[1] === false));
         }
         return t;
@@ -4368,17 +5256,28 @@ var $A = {};
                 value = value.call(t, [t]);
             }
             t.d.value = value;
-            if (t.d.type === 'file') {
+            if (t.type() === 'file') {
                 t.input().data('value', value);
-            } else if (t.d.type === 'html') {
+            } else if (t.type() === 'html') {
                 t.input().html(value);
+            } else if (t.type() === 'radio') {
+                var radio = t.automizyRadio();
+                radio.val.apply(radio, arguments || []);
+                return t;
+            } else if (t.type() === 'select') {
+                var select = t.automizySelect();
+                select.val.apply(select, arguments || []);
+                return t;
             } else {
                 t.input().val(value);
             }
             return t;
         }
-        if (t.d.type === 'html') {
+
+        if (t.type() === 'html') {
             return t.input().html();
+        }else if (t.type() === 'radio') {
+            return t.automizyRadio().val();
         }
         return t.input().val();
     };
@@ -4386,8 +5285,16 @@ var $A = {};
         var t = this;
         if (typeof name !== 'undefined') {
             t.d.name = name;
-            t.input().attr('name', name);
+            if (t.type() === 'radio') {
+                t.automizyRadio().name(t.d.name);
+            }else {
+                t.input().attr('name', t.d.name);
+            }
             return t;
+        }
+
+        if (t.type() === 'radio') {
+            return t.automizyRadio().name();
         }
         return t.d.$input.attr('name');
     };
@@ -4472,6 +5379,15 @@ var $A = {};
         }
         return t.d.width;
     };
+    p.inputWidth = function (inputWidth) {
+        var t = this;
+        if (typeof inputWidth !== 'undefined') {
+            t.d.inputWidth = inputWidth;
+            t.d.$inputCell.css('width', t.d.inputWidth);
+            return t;
+        }
+        return t.d.inputWidth;
+    };
     p.margin = function (margin) {
         var t = this;
         if (typeof margin !== 'undefined') {
@@ -4480,6 +5396,15 @@ var $A = {};
             return t;
         }
         return t.d.margin;
+    };
+    p.padding = function (padding) {
+        var t = this;
+        if (typeof padding !== 'undefined') {
+            t.d.padding = padding;
+            t.widget().css('padding', t.d.padding);
+            return t;
+        }
+        return t.d.padding;
     };
     p.type = function (type) {
         var t = this;
@@ -4763,6 +5688,29 @@ var $A = {};
         }
         return t.d.buttonBottom;
     };
+    p.contentBottom = function (contentBottom) {
+        var t = this;
+        if (typeof contentBottom !== 'undefined') {
+            if (contentBottom === false) {
+                t.d.$widget.removeClass('automizy-input2-has-bottom-content');
+                t.d.$contentBottomBox.ahide();
+                return t;
+            }else{
+                t.d.$widget.addClass('automizy-input2-has-bottom-content');
+                t.d.$contentBottomBox.ashow();
+            }
+            t.d.$contentBottomBox.empty();
+            if (contentBottom instanceof jQuery) {
+                contentBottom.appendTo(t.d.$contentBottomBox);
+            } else if (typeof contentBottom === "object" && typeof contentBottom.draw === "function") {
+                contentBottom.draw(t.d.$contentBottomBox);
+            } else {
+                t.d.$contentBottomBox.html(contentBottom);
+            }
+            return t;
+        }
+        return t.d.$contentBottomBox;
+    };
     p.iconLeft = function (icon, iconType) {
         var t = this;
         if (typeof icon !== 'undefined') {
@@ -4844,20 +5792,100 @@ var $A = {};
         t.d.$inputIconRightCell.click();
         return t;
     };
+    p.innerIconLeft = function (icon, iconType) {
+        var t = this;
+        if (typeof icon !== 'undefined') {
+            t.d.innerIconLeft = icon;
+            if (t.d.innerIconLeft === false) {
+                t.d.$widget.removeClass('automizy-input2-has-inner-left-icon');
+            } else {
+                t.d.$widget.addClass('automizy-input2-has-inner-left-icon');
+                if (t.d.innerIconLeft !== true) {
+                    t.d.$inputInnerIconLeft.ashow();
+                    iconType = iconType || 'fa';
+                    if (iconType === 'fa') {
+                        t.d.$inputInnerIconLeft.removeClassPrefix('fa').addClass(t.d.innerIconLeft);
+                    }
+                }
+            }
+            return t;
+        }
+        return t.d.icon || false;
+    };
+    p.innerIconLeftClick = function (func) {
+        var t = this;
+        if (typeof func === 'function') {
+            t.d.$inputInnerIconLeft.addClass('automizy-clickable').click(function () {
+                func.call(t, [t]);
+            });
+            return t;
+        }
+        t.d.$inputInnerIconLeft.click();
+        return t;
+    };
+    p.innerIconRight = function (icon, iconType) {
+        var t = this;
+        if (typeof icon !== 'undefined') {
+            t.d.innerIconRight = icon;
+            if (t.d.innerIconRight === false) {
+                t.d.$widget.removeClass('automizy-input2-has-inner-right-icon');
+            } else {
+                t.d.$widget.addClass('automizy-input2-has-inner-right-icon');
+                if (t.d.innerIconRight !== true) {
+                    t.d.$inputInnerIconRight.ashow();
+                    iconType = iconType || 'fa';
+                    if (iconType === 'fa') {
+                        t.d.$inputInnerIconRight.removeClassPrefix('fa').addClass(t.d.innerIconRight);
+                    }
+                }
+            }
+            return t;
+        }
+        return t.d.icon || false;
+    };
+    p.innerIconRightClick = function (func) {
+        var t = this;
+        if (typeof func === 'function') {
+            t.d.$inputInnerIconRight.addClass('automizy-clickable').click(function () {
+                func.call(t, [t]);
+            });
+            return t;
+        }
+        t.d.$inputInnerIconRight.click();
+        return t;
+    };
     p.options = function () {
-        var select = this.automizySelect();
-        select.options.apply(select, arguments || []);
-        return this;
+        var t = this;
+        if(t.type() === 'radio'){
+            var radio = t.automizyRadio();
+            radio.options.apply(radio, arguments || []);
+        }else {
+            var select = t.automizySelect();
+            select.options.apply(select, arguments || []);
+        }
+        return t;
     };
     p.addOption = function () {
-        var select = this.automizySelect();
-        select.addOption.apply(select, arguments || []);
-        return this;
+        var t = this;
+        if(t.type() === 'radio'){
+            var radio = t.automizyRadio();
+            radio.addOption.apply(radio, arguments || []);
+        }else {
+            var select = t.automizySelect();
+            select.addOption.apply(select, arguments || []);
+        }
+        return t;
     };
     p.addOptions = function () {
-        var select = this.automizySelect();
-        select.addOptions.apply(select, arguments || []);
-        return this;
+        var t = this;
+        if(t.type() === 'radio'){
+            var radio = t.automizyRadio();
+            radio.addOptions.apply(radio, arguments || []);
+        }else {
+            var select = t.automizySelect();
+            select.addOptions.apply(select, arguments || []);
+        }
+        return t;
     };
     p.removeOption = function () {
         var select = this.automizySelect();
@@ -4878,17 +5906,27 @@ var $A = {};
         this.d.automizySelect = this.input().automizySelect();
         return this.d.automizySelect;
     };
+    p.automizyRadio = function () {
+        var t = this;
+        if(t.d.automizyRadio === false) {
+            t.input().remove();
+            t.d.automizyRadio = $A.newRadio().drawTo(t.d.$inputCell);
+            if(!!t.d.name){
+                t.d.automizyRadio.name(t.d.name);
+            }
+        }
+        return t.d.automizyRadio;
+    };
     p.inlineEditable = function () {
         this.d.inlineEditable = $A.newInlineEditable(this);
         return this.d.inlineEditable;
     };
 
-    //Adding unit or any text in the right side of the input field
     p.measure = function (measure) {
         var t = this;
         if (typeof measure !== 'undefined') {
             t.d.measure = measure;
-            t.d.$inputCell.attr('data-measure', measure);
+            t.d.$inputCell.attr('data-measure', t.d.measure);
             return t;
         }
         return t.d.measure;
@@ -4896,6 +5934,7 @@ var $A = {};
 
     p.showColorPicker = function () {
         var t = this;
+        t.d.colorPickerEnabled = true;
         t.d.$widget.addClass('automizy-input2-has-colorpicker');
         t.d.$colorPickerCell.removeClass('automizy-hide');
         return t;
@@ -4903,55 +5942,60 @@ var $A = {};
 
     p.hideColorPicker = function () {
         var t = this;
+        t.d.colorPickerEnabled = false;
         t.d.$widget.removeClass('automizy-input2-has-colorpicker');
         t.d.$colorPickerCell.addClass('automizy-hide');
         return t;
     };
 
+    p.connectColorPickerToInputField = function(value){
+        var t = this;
+        if(typeof value !== 'undefined') {
+            t.d.connectColorPickerToInputField = $A.parseBoolean(value);
+            return t;
+        }
+        return t.d.connectColorPickerToInputField;
+    };
+    p.colorPickerEnabled = function(value){
+        var t = this;
+        if(typeof value !== 'undefined') {
+            value = $A.parseBoolean(value);
+            if(value){
+                t.showColorPicker();
+            }else{
+                t.hideColorPicker();
+            }
+            return t;
+        }
+        return t.d.colorPickerEnabled;
+    };
+
+
     p.colorPickerValue = function (value) {
         var t = this;
         if (typeof value !== 'undefined') {
-            t.d.$colorPickerInput.val(value);
-
+            t.colorPickerInput().val(value);
             return t;
         }
-        return t.d.$colorPickerInput.val();
+        return t.colorPickerInput().val();
     };
-
-    //used to connect the colorpicker input with the main input
-    p.attachColorPicker = function (attach) {
+    p.colorPickerChange = function(func){
         var t = this;
-        if (typeof attach !== 'undefined') {
-            attach = $A.parseBoolean(attach);
-            t.d.attachColorPicker = attach;
-
-            if (attach) {
-                t.showColorPicker();
-
-                t.d.$colorPickerInput.on('change', colorChangedInPicker)
-                t.d.$input.on('change', colorChangedInInput);
-            }
-            else {
-                t.hideColorPicker();
-
-                t.d.$colorPickerInput.off('change', colorChangedInPicker)
-                t.d.$input.off('change', colorChangedInInput);
-            }
-
-            function colorChangedInPicker() {
-                t.value(t.colorPickerValue());
-            }
-
-            function colorChangedInInput() {
-                t.colorPickerValue(t.val());
-            }
-
+        if(typeof func === 'function') {
+            t.d.colorPickerChange = func;
             return t;
         }
-        return t.d.attachColorPicker;
+        return t.d.colorPickerChange.apply(t, []);
+    };
+    p.colorPickerInput = function(){
+        var t = this;
+        return t.d.$colorPickerInput;
     };
 
-    //show custom spinner on number type inputs
+
+
+
+
     p.enableCustomSpinner = function (enable) {
         var t = this;
         if (typeof enable !== 'undefined') {
@@ -4992,7 +6036,11 @@ var $A = {};
         return t.d.enableCustomSpinner;
     };
 
-    $A.initBasicFunctions(Input2, "Input2", ["change", "keyup", "enter", "focus", "blur", "click"]);
+
+
+
+
+    $A.initBasicFunctions(Input2, "Input2", ["change", "keyup", "enter", "focus", "blur", "click", "automizyChange"]);
 })();
 
 (function(){
@@ -5315,9 +6363,6 @@ var $A = {};
             }
             if (typeof obj.name !== 'undefined') {
                 t.name(obj.name);
-            }
-            if (typeof obj.maxWidth !== 'undefined') {
-                t.maxWidth(obj.maxWidth);
             }
             if (typeof obj.minWidth !== 'undefined') {
                 t.minWidth(obj.minWidth);
@@ -7192,6 +8237,12 @@ var $A = {};
                                 $th.append(obj.html);
                             }
                         }
+                        if (typeof obj.width !== 'undefined') {
+                            $th[0].style.width = obj.width;
+                        }
+                        if (typeof obj.maxWidth !== 'undefined') {
+                            $th[0].style.maxWidth = obj.maxWidth;
+                        }
                         if (obj.sortable !== false) {
                             var $sort = $('<span class="automizy-table-sort-arrow automizy-noselect"></span>');
 
@@ -7475,6 +8526,15 @@ var $A = {};
                             cell.className = 'automizy-main-cell';
                         }
                     }
+                    if (typeof t.d.settings.cols[jMod].width !== 'undefined') {
+                        cell.style.width = t.d.settings.cols[jMod].width;
+                    }
+                    if (typeof t.d.settings.cols[jMod].maxWidth !== 'undefined') {
+                        cell.style.maxWidth = t.d.settings.cols[jMod].maxWidth;
+                    }
+                    if (typeof t.d.settings.cols[jMod].align !== 'undefined') {
+                        cell.style.textAlign = t.d.settings.cols[jMod].align;
+                    }
                 }
 
                 if (table.rows[0].cells[j].style.display === 'none') {
@@ -7539,35 +8599,47 @@ var $A = {};
             if (button.data('condition') !== 'undefined') {
                 var condition = button.data('condition');
                 var autoHide = button.data('autoHide') || false;
-                if (condition === 'select-one') {
-                    if (t.selectedIds().length === 1) {
-                        button.show();
-                        button.enable();
-                    } else {
+                if(typeof condition === 'function'){
+                    if(!condition.apply(t, [button])){
                         if (autoHide) {
                             button.hide();
                         }
                         button.disable();
+                    }else{
+                        button.show();
+                        button.enable();
                     }
-                } else if (condition === 'select-more-than-zero') {
-                    if (t.selectedIds().length >= 1) {
-                        button.show();
-                        button.enable();
-                    } else {
-                        if (autoHide) {
-                            button.hide();
+                }else {
+                    if (condition === 'select-one') {
+                        if (t.selectedIds().length === 1) {
+                            button.show();
+                            button.enable();
+                        } else {
+                            if (autoHide) {
+                                button.hide();
+                            }
+                            button.disable();
                         }
-                        button.disable();
-                    }
-                } else if (condition === 'select-between-two-and-four') {
-                    if (t.selectedIds().length >= 2 && t.selectedIds().length <= 4) {
-                        button.show();
-                        button.enable();
-                    } else {
-                        if (autoHide) {
-                            button.hide();
+                    } else if (condition === 'select-more-than-zero') {
+                        if (t.selectedIds().length >= 1) {
+                            button.show();
+                            button.enable();
+                        } else {
+                            if (autoHide) {
+                                button.hide();
+                            }
+                            button.disable();
                         }
-                        button.disable();
+                    } else if (condition === 'select-between-two-and-four') {
+                        if (t.selectedIds().length >= 2 && t.selectedIds().length <= 4) {
+                            button.show();
+                            button.enable();
+                        } else {
+                            if (autoHide) {
+                                button.hide();
+                            }
+                            button.disable();
+                        }
                     }
                 }
             }
@@ -7600,16 +8672,16 @@ var $A = {};
         if (typeof inlineButtons !== 'undefined') {
             t.d.inlineButtons = inlineButtons;
             t.openableInlineBox(true);
-            for (var i = 0; i < inlineButtons.length; i++) {
-                var inlineButton = inlineButtons[i];
+            for (var i = 0; i < t.d.inlineButtons.length; i++) {
+                var inlineButton = t.d.inlineButtons[i];
 
-                if(typeof inlineButton.drawTo === 'function'){
-                    inlineButton.drawTo(t.d.$inlineButtons);
+                if(typeof t.d.inlineButtons[i].drawTo === 'function'){
+                    t.d.inlineButtons[i].drawTo(t.d.$inlineButtons);
                 }else {
-                    var title = inlineButton.title || '';
-                    var content = inlineButton.text || inlineButton.html || '';
-                    var icon = (typeof inlineButton.icon !== 'undefined' ? '<span class="fa ' + inlineButton.icon + '"></span>' : '');
-                    var $button = $('<a title="' + title + '">' + content + icon + '</a>').data('click', inlineButton.click || function () {
+                    var title = t.d.inlineButtons[i].title || '';
+                    var content = t.d.inlineButtons[i].text || t.d.inlineButtons[i].html || '';
+                    var icon = (typeof t.d.inlineButtons[i].icon !== 'undefined' ? '<span class="fa ' + t.d.inlineButtons[i].icon + '"></span>' : '');
+                    var $button = $('<a title="' + title + '">' + content + icon + '</a>').data('click', t.d.inlineButtons[i].click || function () {
                         }).click(function () {
                         var $t = $(this);
                         var $row = $t.closest('tr').prev();
@@ -7622,7 +8694,8 @@ var $A = {};
                             delay: 1
                         });
                     }
-                    if (!inlineButton.permission) {
+                    t.d.inlineButtons[i].$widget = $button;
+                    if (!t.d.inlineButtons[i].permission) {
                         $button.wrap('<span class="automizy-permission-trap"></span>');
                     }
                 }
@@ -8038,7 +9111,7 @@ var $A = {};
     p.onInlineEditComplete = function (cell, inlineInput) {
         var t = this;
         t.d.onInlineEditComplete(cell, inlineInput);
-    }
+    };
 
     p.setInlineInputObject = function (cell) {
         var t = this;
@@ -8312,7 +9385,7 @@ var $A = {};
     var SelectOptionBox = function (obj) {
         var t = this;
         t.d = {
-            $widget: $('<span class="automizy-select-option-box-widget"></span>'),
+            $widget: $('<span class="automizy-select-option-box-widget automizy-has-check"></span>'),
             $searchBox: $('<div class="automizy-select-search-box"></div>'),
             searchInput: $A.newInput({
                 type:'text',
@@ -8327,6 +9400,7 @@ var $A = {};
             $optionBox: $('<div class="automizy-select-option-box"></div>'),
             $options:$('<table border="0" cellpadding="0" cellspacing="0" class="automizy-select-option-table"></table>'),
             selectModule:false,
+            hasCheck:true,
             maxHeight: '250px',
             position:'auto',
             id: 'automizy-select-option-box-' + $A.getUniqueString()
@@ -8454,6 +9528,7 @@ var $A = {};
                 if(t.selectModule().searchable()){
                     t.d.searchInput.input().focus();
                 }
+                t.widget().toggleClass('automizy-has-check', t.selectModule().hasCheck());
             }
         }
         return t;
@@ -8523,6 +9598,7 @@ var $A = {};
             $icon: $('<span class="automizy-icon"></span>'),
             $option:$('<option></option>'),
             selectModule:false,
+            before:false,
             selectOptionBoxModule:false,
             value: '',
             html:'',
@@ -8531,7 +9607,6 @@ var $A = {};
             disabled: false,
             selected:false,
             hasSelect:false,
-            hasIcon:false,
             id: 'automizy-select-option-' + $A.getUniqueString()
         };
         t.f = {};
@@ -8546,6 +9621,9 @@ var $A = {};
         if (typeof obj !== 'undefined') {
             if (typeof obj.selectModule !== 'undefined') {
                 t.selectModule(obj.selectModule);
+            }
+            if (typeof obj.before !== 'undefined') {
+                t.before(obj.before);
             }
             if (typeof obj.selectOptionBoxModule !== 'undefined') {
                 t.selectOptionBoxModule(obj.selectOptionBoxModule);
@@ -8615,11 +9693,23 @@ var $A = {};
         }
         return t.d.selectModule;
     };
+    p.before = function (before) {
+        var t = this;
+        if (typeof before !== 'undefined') {
+            t.d.before = before;
+            return t;
+        }
+        return t.d.before;
+    };
     p.selectOptionBoxModule = function (selectOptionBoxModule) {
         var t = this;
         if (typeof selectOptionBoxModule !== 'undefined') {
             t.d.selectOptionBoxModule = selectOptionBoxModule;
-            t.drawTo(t.d.selectOptionBoxModule.d.$options);
+            if(t.before()){
+                t.drawTo(t.d.selectOptionBoxModule.d.$options, 'prepend');
+            }else {
+                t.drawTo(t.d.selectOptionBoxModule.d.$options);
+            }
             return t;
         }
         return t.d.selectOptionBoxModule;
@@ -8862,7 +9952,7 @@ var $A = {};
         var t = this;
         t.d = {
             $widget: $('<div class="automizy-select automizy-has-arrow automizy-empty"></div>'),
-            $loadingBox: $('<div class="automizy-select-loading-box">'+$A.translate('loading...')+'</div>'),
+            $loadingBox: $('<div class="automizy-select-loading-box">' + $A.translate('loading...') + '</div>'),
             $emptyBox: $('<div class="automizy-select-empty-box"></div>'),
             $widgetTable: $('<table border="0" cellpadding="0" cellspacing="0" class="automizy-select-table"></table>'),
             $widgetTr: $('<tr class="automizy-select-tr"></tr>'),
@@ -8873,21 +9963,22 @@ var $A = {};
             $widgetTdArrowIcon: $('<span class="automizy-icon automizy-icon-select-arrow"></span>'),
             $icon: $('<span class="automizy-icon"></span>'),
             originalInput: $('<select></select>').data('automizy-select-remove', true),
-            optionBox:$A.newSelectOptionBox().selectModule(t),
-            options:[],
-            groups:{},
+            optionBox: $A.newSelectOptionBox().selectModule(t),
+            options: [],
+            groups: {},
             tmpValue: null,
             value: null,
-            content:false,
-            multiple:false,
+            content: false,
+            multiple: false,
             disabled: false,
-            loading:false,
-            empty:false,
-            searchable:false,
-            showMessageIfEmpty:false,
-            emptyText:$A.translate('Select an option'),
-            selectedText:$A.translate('# items selected'),
-            maxVisibleItems:2,
+            loading: false,
+            empty: false,
+            searchable: false,
+            showMessageIfEmpty: false,
+            hasCheck: true,
+            emptyText: $A.translate('Select an option'),
+            selectedText: $A.translate('# items selected'),
+            maxVisibleItems: 2,
             width: 'auto',
             height: 'auto',
             id: 'automizy-select-' + $A.getUniqueString(),
@@ -8923,13 +10014,13 @@ var $A = {};
             t.initParameter(obj);
         }
 
-        t.widget().click(function(){
-            if(t.d.loading === true || t.d.empty){
+        t.widget().click(function () {
+            if (t.d.loading === true || t.d.empty) {
                 return false;
             }
-            if(t.widget().hasClass('automizy-active')){
+            if (t.widget().hasClass('automizy-active')) {
                 $A.closeAllSelectBox();
-            }else {
+            } else {
                 t.open();
             }
         });
@@ -8940,7 +10031,7 @@ var $A = {};
     var p = Select.prototype;
 
 
-    p.setupJQueryEvents = function(){
+    p.setupJQueryEvents = function () {
         var t = this;
         t.originalInput().unbind('change', t.d.change).bind('change', t.d.change);
     };
@@ -8948,25 +10039,27 @@ var $A = {};
     p.originalInput = function (originalInput) {
         var t = this;
         if (typeof originalInput !== 'undefined') {
-            if(t.d.originalInput.data('automizy-select-remove') == true){
+            if (t.d.originalInput.data('automizy-select-remove') == true) {
                 t.d.originalInput.remove();
             }
             t.d.originalInput = originalInput;
             var $elem;
-            if(t.width() === 'auto'){
+            if (t.width() === 'auto') {
                 t.width(t.d.originalInput.width());
             }
             /*if(t.height() === 'auto'){
-                t.height(t.d.originalInput.height());
-            }*/
-            if(typeof t.d.originalInput.input === 'function'){
+             t.height(t.d.originalInput.height());
+             }*/
+            if (typeof t.d.originalInput.input === 'function') {
                 $elem = t.d.originalInput.input();
-            }else{
+            } else {
                 $elem = t.d.originalInput;
             }
-            (function(t){setTimeout(function(){
-                t.widget().insertAfter($elem);
-            }, 10)})(t);
+            (function (t) {
+                setTimeout(function () {
+                    t.widget().insertAfter($elem);
+                }, 10)
+            })(t);
             $elem.hide();
             $elem.data('automizy-select', t);
             t.d.originalInput.data('automizy-select', t);
@@ -8978,25 +10071,28 @@ var $A = {};
     p.optionBox = function () {
         return this.d.optionBox;
     };
-    p.confirmValue = function(){
+    p.confirmValue = function (changeTrigger) {
         var t = this;
+        if (typeof changeTrigger === 'undefined') {
+            changeTrigger = true;
+        }
 
         t.unselectAll();
         var hasValue = false;
 
-        if(typeof t.d.value === 'object' || typeof t.d.value === 'array'){
-            for(var i = 0; i < t.d.options.length; i++){
-                for(var j = 0; j < t.d.value.length; j++){
-                    if(t.d.options[i].val() == t.d.value[j]){
+        if (typeof t.d.value === 'object' || typeof t.d.value === 'array') {
+            for (var i = 0; i < t.d.options.length; i++) {
+                for (var j = 0; j < t.d.value.length; j++) {
+                    if (t.d.options[i].val() == t.d.value[j]) {
                         t.d.options[i].select(false, true);
                         hasValue = true;
                     }
                 }
             }
             t.refreshValue();
-        }else{
-            for(var i = 0; i < t.d.options.length; i++){
-                if(t.d.options[i].val() == t.d.value){
+        } else {
+            for (var i = 0; i < t.d.options.length; i++) {
+                if (t.d.options[i].val() == t.d.value) {
                     t.d.options[i].select();
                     hasValue = true;
                     break;
@@ -9004,35 +10100,53 @@ var $A = {};
             }
         }
 
-        if(!hasValue){
+        if (!hasValue) {
             t.content(t.emptyText());
             t.widget().addClass('automizy-empty');
-        }else{
+        } else {
             t.widget().removeClass('automizy-empty');
         }
-        t.d.originalInput.val(t.d.value).trigger('change');
+        t.d.originalInput.val(t.d.value);
+        if (changeTrigger) {
+            t.d.originalInput.trigger('change');
+        }
 
         return t;
     };
-    p.val = p.value = function (value) {
+    p.val = p.value = function (value, changeTrigger) {
         var t = this;
+        if (typeof changeTrigger === 'undefined') {
+            changeTrigger = true;
+        }
         if (typeof value !== 'undefined') {
             t.d.value = value;
-            if(t.d.loading){
+            if (t.d.loading) {
                 t.d.tmpValue = t.d.value;
-            }else {
-                t.confirmValue();
+            } else {
+                t.confirmValue(changeTrigger);
             }
             return t;
         }
         return t.d.value;
     };
+    p.textValue = function () {
+        var t = this;
+        if(t.multiple()){
+            var values = [];
+            var options = t.selectedOptions();
+            for(var i = 0; i < options.length; i++){
+                values.push(options[i].textValue());
+            }
+            return values;
+        }
+        return t.selectedOption().textValue();
+    };
     p.selectedOptions = function () {
         var t = this;
 
         var options = [];
-        for(var i = 0; i < t.d.options.length; i++){
-            if(t.d.options[i].selected()){
+        for (var i = 0; i < t.d.options.length; i++) {
+            if (t.d.options[i].selected()) {
                 options.push(t.d.options[i]);
             }
         }
@@ -9043,8 +10157,8 @@ var $A = {};
         var t = this;
 
         var option = false;
-        for(var i = 0; i < t.d.options.length; i++){
-            if(t.d.options[i].selected()){
+        for (var i = 0; i < t.d.options.length; i++) {
+            if (t.d.options[i].selected()) {
                 option = t.d.options[i];
                 break;
             }
@@ -9062,15 +10176,29 @@ var $A = {};
         return t.d.content;
     };
 
+    p.hasCheck = function(hasCheck){
+        var t = this;
+        if (typeof hasCheck !== 'undefined') {
+            t.d.hasCheck = $A.parseBoolean(hasCheck);
+            if(t.d.hasCheck === true){
+                t.optionBox().widget().addClass('automizy-has-check');
+            }else{
+                t.optionBox().widget().removeClass('automizy-has-check');
+            }
+            return t;
+        }
+        return t.d.hasCheck;
+    };
 
-    p.icon = function(o){
+
+    p.icon = function (o) {
         var t = this;
         if (typeof o !== 'undefined') {
-            if(o === false){
+            if (o === false) {
                 t.hasIcon(false);
-            } else if(typeof o === 'string'){
+            } else if (typeof o === 'string') {
                 t.d.icon = o;
-                t.d.$icon.removeClass().addClass('automizy-icon automizy-icon-'+o);
+                t.d.$icon.removeClass().addClass('automizy-icon automizy-icon-' + o);
                 t.hasIcon(true);
             } else {
                 var icon = {
@@ -9096,13 +10224,13 @@ var $A = {};
 
         return t.d.icon;
     };
-    p.hasIcon = function(hasIcon){
+    p.hasIcon = function (hasIcon) {
         var t = this;
         if (typeof hasIcon !== 'undefined') {
             t.d.hasIcon = $A.parseBoolean(hasIcon);
-            if(t.d.hasIcon === true){
+            if (t.d.hasIcon === true) {
                 t.widget().addClass('automizy-has-icon');
-            }else{
+            } else {
                 t.widget().removeClass('automizy-has-icon');
             }
             return t;
@@ -9115,15 +10243,15 @@ var $A = {};
         var t = this;
         if (typeof multiple !== 'undefined') {
             t.d.multiple = $A.parseBoolean(multiple);
-            if(typeof t.d.originalInput.multiple !== 'undefined'){
+            if (typeof t.d.originalInput.multiple !== 'undefined') {
                 t.d.originalInput.multiple(t.d.multiple);
-            }else{
+            } else {
                 t.d.originalInput.attr('multiple', t.d.multiple);
             }
 
-            if(t.d.multiple === true){
+            if (t.d.multiple === true) {
                 t.widget().addClass('automizy-multiple');
-            }else{
+            } else {
                 t.widget().removeClass('automizy-multiple');
             }
 
@@ -9135,16 +10263,16 @@ var $A = {};
         var t = this;
         if (typeof disabled !== 'undefined') {
             disabled = $A.parseBoolean(disabled);
-            if(disabled){
+            if (disabled) {
                 $A.closeAllSelectBox();
                 t.widget().addClass('automizy-disabled');
-            }else{
+            } else {
                 t.widget().removeClass('automizy-disabled');
             }
             t.d.disabled = disabled;
-            if(typeof t.d.originalInput.disabled !== 'undefined'){
+            if (typeof t.d.originalInput.disabled !== 'undefined') {
                 t.d.originalInput.disabled(t.d.disabled);
-            }else{
+            } else {
                 t.d.originalInput.attr('disabled', disabled);
             }
             return t;
@@ -9160,20 +10288,21 @@ var $A = {};
     p.unselectAll = function (triggerChange) {
         var t = this;
         var triggerChange = triggerChange || false;
-        for(var i = 0; i < t.d.options.length; i++){
+        for (var i = 0; i < t.d.options.length; i++) {
             t.d.options[i].unselect(false, true);
         }
-        if(triggerChange === true){
+        if (triggerChange === true) {
             t.originalInput().trigger('change');
         }
         return t;
     };
     p.width = function (width) {
         var t = this;
+        var t = this;
         if (typeof width !== 'undefined') {
             t.d.width = width;
             t.widget().css('width', t.d.width);
-            setTimeout(function() {
+            setTimeout(function () {
                 //t.d.$widgetTdContentDiv.css('max-width', t.widget().width() - 12 + 'px');
             }, 10);
             return t;
@@ -9181,14 +10310,14 @@ var $A = {};
         return t.d.width;
     };
     /*p.height = function (height) {
-        var t = this;
-        if (typeof height !== 'undefined') {
-            t.d.height = height;
-            t.d.$widgetTable.css('height', t.d.height);
-            return t;
-        }
-        return t.d.height;
-    };*/
+     var t = this;
+     if (typeof height !== 'undefined') {
+     t.d.height = height;
+     t.d.$widgetTable.css('height', t.d.height);
+     return t;
+     }
+     return t.d.height;
+     };*/
     p.refreshValue = function () {
         var t = this;
         var options = t.d.options;
@@ -9197,43 +10326,43 @@ var $A = {};
         var selectedOptionCount = 0;
         var icon = false;
 
-        for(var i = 0; i < options.length; i++){
-            if(options[i].selected()){
+        for (var i = 0; i < options.length; i++) {
+            if (options[i].selected()) {
                 selectedOptionCount++;
                 textValues.push(options[i].textValue());
                 values.push(options[i].val());
-                if(options[i].hasIcon()){
+                if (options[i].hasIcon()) {
                     icon = options[i].icon();
                 }
             }
         }
 
-        if(selectedOptionCount === 1){
+        if (selectedOptionCount === 1) {
             t.icon(icon);
-        }else {
+        } else {
             t.icon(false);
         }
 
-        if(textValues.length <= 0){
+        if (textValues.length <= 0) {
             t.content(t.emptyText());
             t.widget().addClass('automizy-empty');
-        }else {
-            if(textValues.length > t.maxVisibleItems()){
+        } else {
+            if (textValues.length > t.maxVisibleItems()) {
                 t.content(t.selectedText().replace("#", textValues.length));
-            }else {
+            } else {
                 t.content(textValues.join(', '));
             }
             t.widget().removeClass('automizy-empty');
         }
 
-        if(values.length > 0) {
+        if (values.length > 0) {
             if (t.multiple()) {
                 t.d.value = values;
             } else {
                 t.d.value = values[0];
             }
             t.originalInput().val(t.d.value);
-        }else{
+        } else {
             t.d.value = null;
             t.originalInput().prop("selectedIndex", -1);
         }
@@ -9245,14 +10374,14 @@ var $A = {};
         var groups = t.d.groups;
         var usableGroups = [];
         var options = t.d.options;
-        for(var i = 0; i < options.length; i++){
+        for (var i = 0; i < options.length; i++) {
             var group = options[i].group();
-            if(usableGroups.indexOf(group) < 0){
+            if (usableGroups.indexOf(group) < 0) {
                 usableGroups.push(group);
             }
         }
-        for(var i in groups){
-            if(usableGroups.indexOf(i) < 0){
+        for (var i in groups) {
+            if (usableGroups.indexOf(i) < 0) {
                 groups[i].$titleTd.remove();
                 groups[i].$separatorTd.remove();
                 groups[i].$titleTr.remove();
@@ -9262,7 +10391,7 @@ var $A = {};
         }
         return t;
     };
-    p.emptyText = p.placeholder = function(emptyText){
+    p.emptyText = p.placeholder = function (emptyText) {
         var t = this;
         if (typeof emptyText !== 'undefined') {
             t.d.emptyText = emptyText;
@@ -9270,7 +10399,7 @@ var $A = {};
         }
         return t.d.emptyText;
     };
-    p.selectedText = function(selectedText){
+    p.selectedText = function (selectedText) {
         var t = this;
         if (typeof selectedText !== 'undefined') {
             t.d.selectedText = selectedText;
@@ -9278,7 +10407,7 @@ var $A = {};
         }
         return t.d.selectedText;
     };
-    p.maxVisibleItems = function(maxVisibleItems){
+    p.maxVisibleItems = function (maxVisibleItems) {
         var t = this;
         if (typeof maxVisibleItems !== 'undefined') {
             t.d.maxVisibleItems = parseInt(maxVisibleItems);
@@ -9290,7 +10419,7 @@ var $A = {};
 
     p.removeOptions = function () {
         var t = this;
-        for(var i = 0; i < t.d.options.length; i++){
+        for (var i = 0; i < t.d.options.length; i++) {
             t.d.options[i].remove();
         }
         t.d.options = [];
@@ -9299,23 +10428,23 @@ var $A = {};
     };
     p.removeOption = function (value) {
         var t = this;
-        for(var i = 0; i < t.d.options.length; i++){
-            if(t.d.options[i].val() == value){
+        for (var i = 0; i < t.d.options.length; i++) {
+            if (t.d.options[i].val() == value) {
                 t.d.options[i].remove();
             }
         }
         t.cleanGroups();
         return t;
     };
-    p.addOption = function(option){
-        return this.addOptions([option]);
+    p.addOption = function (option, before) {
+        return this.addOptions([option], before || false);
     };
     p.options = function (options) {
         var t = this;
         if (typeof options !== 'undefined') {
             t.removeOptions();
             t.addOptions(options);
-            if(t.d.showMessageIfEmpty) {
+            if (t.d.showMessageIfEmpty) {
                 if (options.length <= 0) {
                     t.widget().addClass('automizy-empty-select');
                     t.d.empty = true;
@@ -9328,38 +10457,47 @@ var $A = {};
         }
         return t.d.options;
     };
-    p.addOptions = function(options, before){
+    p.getOptionValues = function () {
+        var t = this;
+        var values = [];
+        t.d.options.forEach(function(option){
+            values.push(option.val());
+        });
+        return values;
+    };
+    p.addOptions = function (options, before) {
         var t = this;
         var val = t.val();
-        var before = before || false;
-        var options = options || [];
-        if(!(options instanceof Array)){
+        before = before || false;
+        options = options || [];
+        if (!(options instanceof Array)) {
             var optionsArray = [];
-            for(var i in options){
+            for (var i in options) {
                 optionsArray.push({
-                    value:i,
-                    html:options[i]
+                    value: i,
+                    html: options[i]
                 })
             }
             options = optionsArray;
         }
-        for(var i = 0; i < options.length; i++){
-            if(options[i] instanceof Array){
+        for (var i = 0; i < options.length; i++) {
+            if (options[i] instanceof Array) {
                 options[i] = {
-                    value:options[i][0] || 0,
-                    html:options[i][1] || options[i][0],
-                    selected:$A.parseBoolean(options[i][2] || false)
+                    value: options[i][0] || 0,
+                    html: options[i][1] || options[i][0],
+                    selected: $A.parseBoolean(options[i][2] || false)
                 };
-            }else if(typeof options[i] === 'string' || typeof options[i] === 'number'){
+            } else if (typeof options[i] === 'string' || typeof options[i] === 'number') {
                 options[i] = {
-                    value:options[i],
-                    html:options[i],
-                    selected:false
+                    value: options[i],
+                    html: options[i],
+                    selected: false
                 };
             }
             options[i].selectModule = t;
             options[i].selectOptionBoxModule = t.optionBox();
-            if(options[i].selected === true){
+            options[i].before = before;
+            if (options[i].selected === true) {
                 hasSelected = true;
             }
             var option = $A.newSelectOption(options[i], false);
@@ -9369,14 +10507,14 @@ var $A = {};
         t.originalInput().change();
         return t;
     };
-    p.loadingStart = function(){
+    p.loadingStart = function () {
         var t = this;
         t.widget().addClass('automizy-loading');
         t.d.tmpValue = t.val() || false;
         t.d.loading = true;
         return t;
     };
-    p.loadingStop = function(){
+    p.loadingStop = function () {
         var t = this;
         t.widget().removeClass('automizy-loading');
         t.d.loading = false;
@@ -9390,7 +10528,7 @@ var $A = {};
             var a = t.runFunctions('loadingComplete');
             t.returnValue(!(t.disabled() === true || a[0] === false || a[1] === false));
             t.loadingStop();
-            if(t.d.tmpValue !== false){
+            if (t.d.tmpValue !== false) {
                 t.val(t.d.tmpValue);
                 t.d.tmpValue = false;
             }
@@ -9398,7 +10536,7 @@ var $A = {};
         return t;
     };
 
-    p.emptyMessage = function(msg){
+    p.emptyMessage = function (msg) {
         var t = this;
         t.d.showMessageIfEmpty = true;
 
@@ -9452,7 +10590,7 @@ var $A = {};
         delete $A.d["selects"][this.id()];
         this.d.remove.apply(this, [this, this.d.$widget]);
         this.d.optionBox.remove();
-        for(var i = 0; i < this.d.options.length; i++){
+        for (var i = 0; i < this.d.options.length; i++) {
             this.d.options[i].remove();
         }
         this.originalInput().remove();
@@ -9481,11 +10619,11 @@ var $A = {};
     };
     p.searchable = function (value) {
         var t = this;
-        if(typeof value !== 'undefined'){
+        if (typeof value !== 'undefined') {
             t.d.searchable = $A.parseBoolean(value);
-            if(t.d.searchable){
+            if (t.d.searchable) {
                 t.d.optionBox.d.$searchBox.show();
-            }else{
+            } else {
                 t.d.optionBox.d.$searchBox.hide();
             }
             return t;
@@ -9496,11 +10634,11 @@ var $A = {};
         var t = this;
         var text = text || '';
         var options = t.options();
-        if(text.length <= 0){
-            for(var i = 0; i < options.length; i++) {
+        if (text.length <= 0) {
+            for (var i = 0; i < options.length; i++) {
                 options[i].show();
             }
-        }else{
+        } else {
             for (var i = 0; i < options.length; i++) {
                 var str = '';
                 str += options[i].val();
@@ -9517,46 +10655,45 @@ var $A = {};
     };
 
 
-
     $A.initBasicFunctions(Select, "Select", ['change', 'loadingComplete', 'manualChange']);
 
 
     $.fn.automizySelect = function () {
         var lastElement = false;
-        if(typeof this.data('automizy-select') !== 'undefined'){
+        if (typeof this.data('automizy-select') !== 'undefined') {
             return this.data('automizy-select');
         }
 
-        this.each(function(){
+        this.each(function () {
             var selectModule = $A.newSelect();
             var $t = $(this);
 
-            if($t.prop("tagName").toLowerCase() !== 'select'){
+            if ($t.prop("tagName").toLowerCase() !== 'select') {
                 var $newElem = $('<select></select>');
-                $.each(this.attributes, function() {
+                $.each(this.attributes, function () {
                     $newElem.attr(this.name, this.value);
                 });
                 $t.replaceWith($newElem);
                 $t = $newElem;
             }
 
-            if($t.is(':disabled')){
+            if ($t.is(':disabled')) {
                 selectModule.disable();
             }
 
             selectModule.multiple($t.is("[multiple]")).placeholder($t.attr('placeholder') || $A.translate('Select an option')).originalInput($t);
 
             var options = [];
-            $t.find('option').each(function(){
+            $t.find('option').each(function () {
                 var $to = $(this);
                 var option = {
-                    value:$to.attr('value'),
-                    html:$to.html(),
-                    disabled:$to.is(':disabled'),
-                    selected:$to.is(':selected')
+                    value: $to.attr('value'),
+                    html: $to.html(),
+                    disabled: $to.is(':disabled'),
+                    selected: $to.is(':selected')
                 };
                 var optgroup = $to.closest('optgroup');
-                if(optgroup.length >= 0){
+                if (optgroup.length >= 0) {
                     option.group = optgroup.attr('label');
                 }
 
@@ -9564,7 +10701,7 @@ var $A = {};
             });
             selectModule.options(options);
 
-            if($t.hasClass('automizy-input2-input')){
+            if ($t.hasClass('automizy-input2-input')) {
                 //var input2 = $A.getInput2($t.closest('.automizy-input2').attr('id'));
                 //input2.data('automizy-select', selectModule);
                 selectModule.width('100%');
@@ -9576,6 +10713,153 @@ var $A = {};
         });
         return lastElement;
     };
+
+
+})();
+
+(function(){
+    var Radio = function (obj) {
+        var t = this;
+        t.d = {
+            $widget: $('<div class="automizy-radio"></div>'),
+            options: [],
+            id: 'automizy-radio-' + $A.getUniqueString(),
+            name: 'automizy-radio-' + $A.getUniqueString(),
+
+            change: function () {
+                if (t.change().returnValue() === false) {
+                    return false;
+                }
+            },
+            manualChange: function () {
+                if (t.manualChange().returnValue() === false) {
+                    return false;
+                }
+            }
+        };
+        t.f = {};
+        t.init();
+
+
+        if (typeof obj !== 'undefined') {
+            t.initParameter(obj);
+        }
+    };
+
+    var p = Radio.prototype;
+
+    p.val = p.value = function (value) {
+        var t = this;
+        if (typeof value !== 'undefined') {
+            t.d.value = value;
+            for(var i = 0; i < t.d.options.length; i++){
+                if(t.d.options[i].value == t.d.value){
+                    t.d.options[i].$input.prop('checked', true);
+                }
+            }
+            return t;
+        }
+        return t.d.$widget.find('input:checked').val();
+    };
+    p.name = function (name) {
+        var t = this;
+        if (typeof name !== 'undefined') {
+            t.d.name = name;
+            for(var i = 0; i < t.d.options.length; i++){
+                t.d.options[i].$input.attr('name', t.d.name);
+            }
+            return t;
+        }
+        return t.d.name;
+    };
+    p.addOption = function (option) {
+        return this.addOptions([option]);
+    };
+    p.options = function (options) {
+        var t = this;
+        if (typeof options !== 'undefined') {
+            //t.removeOptions();
+            t.addOptions(options);
+            return t;
+        }
+        return t.d.options;
+    };
+    p.addOptions = function (options) {
+        var t = this;
+        options = options || [];
+
+        for (var i = 0; i < options.length; i++) {
+            options[i].radio = t;
+            options[i].$box = $('<label class="automizy-radio-option-box"></label>').appendTo(t.widget());
+            options[i].$labelBefore = $('<span class="automizy-radio-option-label-before"></span>').appendTo(options[i].$box).ahide();
+            options[i].$input = $('<input type="radio" class="automizy-radio-option" />').data('automizy-radio-option', options[i]).attr({
+                name: t.name(),
+                value: options[i].value
+            }).appendTo(options[i].$box).change(function(){
+                t.change.apply(t, []);
+            });
+            options[i].$labelAfter = $('<span class="automizy-radio-option-label-after"></span>').appendTo(options[i].$box).ahide();
+
+            if(typeof options[i].labelBefore !== 'undefined'){
+                options[i].$labelBefore.html(options[i].labelBefore).ashow();
+            }
+            if(typeof options[i].labelAfter !== 'undefined'){
+                options[i].$labelAfter.html(options[i].labelAfter).ashow();
+            }
+            if(typeof options[i].newRow !== 'undefined' && options[i].newRow === true){
+                options[i].$box.append('<br/>');
+                options[i].$labelAfter.css('margin-right', 0);
+            }
+
+            t.d.options.push(options[i]);
+        }
+
+        return t;
+    };
+
+    p.change = function (func, name, life) {
+        var t = this;
+        if (typeof func === 'function') {
+            t.addFunction('change', func, name, life);
+        } else {
+            var a = t.runFunctions('change');
+            t.returnValue(!(t.disabled() === true || a[0] === false || a[1] === false));
+        }
+        return t;
+    };
+    p.manualChange = function (func, name, life) {
+        var t = this;
+        if (typeof func === 'function') {
+            t.addFunction('manualChange', func, name, life);
+        } else {
+            var a = t.runFunctions('manualChange');
+            t.returnValue(!(t.disabled() === true || a[0] === false || a[1] === false));
+        }
+        return t;
+    };
+
+    p.drawTo = p.draw = p.appendTo = function ($target) {
+        var t = this;
+        $target = $target || $('body');
+        t.d.$widget.appendTo($target);
+        return t;
+    };
+    p.show = function () {
+        var t = this;
+        this.d.$widget.ashow();
+        return t;
+    };
+    p.hide = function () {
+        var t = this;
+        this.d.$widget.ahide();
+        return t;
+    };
+    p.disabled = function(){
+        return false;
+    };
+
+
+    $A.initBasicFunctions(Radio, "Radio", ['change', 'manualChange']);
 
 
 })();
@@ -9602,6 +10886,9 @@ var $A = {};
             type: 'info',
             target: 'body',
             closable: true,
+            autoClose:false,
+            autoCloseTimeout:0,
+            delay:350,
             id: 'automizy-message-' + $A.getUniqueString()
         };
         t.f = {};
@@ -9649,6 +10936,12 @@ var $A = {};
             if (typeof obj.name !== 'undefined') {
                 t.name(obj.name);
             }
+            if (typeof obj.delay !== 'undefined') {
+                t.delay(obj.delay);
+            }
+            if (typeof obj.autoClose !== 'undefined') {
+                t.autoClose(obj.autoClose);
+            }
             t.initParameter(obj);
         }
 
@@ -9670,6 +10963,24 @@ var $A = {};
             $A.messagesByName[t.d.name] = t;
         }
         return t.d.name;
+    };
+
+    p.delay = function (delay) {
+        var t = this;
+        if (typeof delay !== 'undefined') {
+            t.d.delay = delay;
+            return t;
+        }
+        return t.d.delay;
+    };
+
+    p.autoClose = function (autoClose) {
+        var t = this;
+        if (typeof autoClose !== 'undefined') {
+            t.d.autoClose = autoClose || false;
+            return t;
+        }
+        return t.d.autoClose;
     };
 
     p.title = function (title) {
@@ -9728,13 +11039,19 @@ var $A = {};
         if (typeof param1 === 'function') {
             t.addFunction.apply(t, ['open', param1, name, life]);
         } else {
-            var delay = 350;
+            var delay = t.delay();
             if (typeof param1 !== 'undefined') {
                 delay = param1;
             }
             t.widget().fadeIn(delay, function () {
                 t.runFunctions('open');
             });
+            clearTimeout(t.d.autoCloseTimeout);
+            if(t.autoClose() !== false){
+                t.d.autoCloseTimeout = setTimeout(function(){
+                    t.close();
+                }, t.autoClose());
+            }
         }
         return t;
     };
@@ -9747,7 +11064,7 @@ var $A = {};
         if (typeof param1 === 'function') {
             t.addFunction.apply(t, ['close', param1, name, life]);
         } else {
-            var delay = 350;
+            var delay = t.delay();
             if (typeof param1 !== 'undefined') {
                 delay = param1;
             }
@@ -9850,16 +11167,23 @@ var $A = {};
         t.d = {
             $widget: $('<div class="automizy-panel"></div>'),
             $title: $('<div class="automizy-panel-title"></div>'),
+            $navigator: $('<div class="automizy-panel-navigator"></div>'),
             $content: $('<div class="automizy-panel-content"></div>'),
+            $navigatorContents: $('<div class="automizy-panel-navigator-contents"></div>'),
 
             title:'',
             content:'',
+            nowrap:false,
+            padding:'15px 20px',
+            navigators:{},
             id: 'automizy-panel-' + $A.getUniqueString()
         };
         t.f = {};
         t.init();
 
+        t.d.$navigator.appendTo(t.d.$widget);
         t.d.$content.appendTo(t.d.$widget);
+        t.d.$navigatorContents.appendTo(t.d.$widget);
         if (typeof obj !== 'undefined') {
 
             if (typeof obj.title !== 'undefined') {
@@ -9867,6 +11191,18 @@ var $A = {};
             }
             if (typeof obj.content !== 'undefined') {
                 t.content(obj.content);
+            }
+            if (typeof obj.padding !== 'undefined') {
+                t.padding(obj.padding);
+            }
+            if (typeof obj.nowrap !== 'undefined') {
+                t.nowrap(obj.nowrap);
+            }
+            if (typeof obj.navigators !== 'undefined') {
+                t.navigators(obj.navigators);
+            }
+            if (typeof obj.maxWidth !== 'undefined') {
+                t.maxWidth(obj.maxWidth);
             }
 
             t.initParameter(obj);
@@ -9894,24 +11230,88 @@ var $A = {};
         }
         return t.d.maxWidth;
     };
-    p.content = function (content) {
+    p.padding = function (padding) {
         var t = this;
-        if (typeof content !== 'undefined') {
-            if (t.d.$content.contents() instanceof jQuery) {
-                t.d.$content.contents().appendTo($A.$tmp);
-            }
-            t.d.$content.empty();
-            t.d.content = content;
-            if (t.d.content instanceof jQuery) {
-                t.d.content.appendTo(t.d.$content);
-            } else if(typeof t.d.content.drawTo === 'function') {
-                t.d.content.drawTo(t.d.$content);
-            } else {
-                t.d.$content.html(t.d.content);
+        if (typeof padding !== 'undefined') {
+            t.d.padding = padding;
+            t.d.$content.css('padding', t.d.padding);
+            return t;
+        }
+        return t.d.padding;
+    };
+    p.nowrap = function (nowrap) {
+        var t = this;
+        if (typeof nowrap !== 'undefined') {
+            t.d.nowrap = $A.parseBoolean(nowrap);
+            if(t.d.nowrap){
+                t.d.$content.css('white-space', 'nowrap');
+            }else{
+                t.d.$content.css('white-space', 'normal');
             }
             return t;
         }
+        return t.d.nowrap;
+    };
+    p.content = function (content) {
+        var t = this;
+        if (typeof content !== 'undefined') {
+            t.d.content = content;
+            $A.setContent(t.d.content, t.d.$content);
+            return t;
+        }
         return t.d.content;
+    };
+    p.navigators = function (navigators) {
+        var t = this;
+        if (typeof navigators !== 'undefined') {
+            t.d.$navigator.empty();
+            t.d.$navigatorContents.empty();
+            t.d.navigators = {};
+            navigators.forEach(function(navigator){
+                t.addNavigator(navigator)
+            });
+            return t;
+        }
+        return t.d.navigators;
+    };
+    p.addNavigator = function (navigator) {
+        var t = this;
+        var navigatorObj = {};
+        navigatorObj.text = navigator.text || '-';
+        navigatorObj.name = navigator.name || navigator.text;
+        navigatorObj.content = navigator.content || '';
+        navigatorObj.activate = navigator.activate || function(){};
+        navigatorObj.$element = $('<div class="automizy-panel-navigator-element"></div>').appendTo(t.d.$navigator).data('navigator', navigatorObj).text(navigatorObj.text).click(function(){
+            var navigator = $(this).data('navigator');
+            for(var i in t.d.navigators){
+                t.d.navigators[i].$element.removeClass('automizy-active');
+                t.d.navigators[i].$content.ahide();
+            }
+            navigator.$element.addClass('automizy-active');
+            navigator.$content.ashow();
+            navigator.activate.apply(navigator, []);
+        });
+        navigatorObj.$content = $('<div class="automizy-panel-navigator-content"></div>').appendTo(t.d.$navigatorContents).ahide();
+        $A.setContent(navigatorObj.content, navigatorObj.$content);
+
+        t.d.navigators[navigatorObj.name] = navigatorObj;
+        return t;
+    };
+    p.setNavigatorContent = function (content, name) {
+        var t = this;
+        if(typeof t.d.navigators[name] === 'undefined'){
+            return t;
+        }
+        $A.setContent(content, t.d.navigators[name].$content);
+        return t;
+    };
+    p.activateNavigator = function (name) {
+        var t = this;
+        if(typeof t.d.navigators[name] === 'undefined'){
+            return t;
+        }
+        t.d.navigators[name].$element.click();
+        return t;
     };
 
 
@@ -10077,7 +11477,7 @@ var $A = {};
 
                 tags: [],
                 options: {},
-                newTag: $A.newTag({text: '<input class="automizy-tagger-new-tag-input">'}),
+                newTag: $A.newTag({text: '<input class="automizy-tagger-new-tag-input" onkeydown="if(event.keyCode === 32)return false;">'}),
                 tagWidth: '200px'
             }
             ;
@@ -10279,7 +11679,7 @@ var $A = {};
                 function resetNewTag() {
                     t.hideOptions();
                     tag.widget().ahide();
-                    tag.text('<input type="text" class="automizy-tagger-new-tag-input">');
+                    tag.text('<input type="text" class="automizy-tagger-new-tag-input" onkeydown="if(event.keyCode === 32)return false;">');
 
                     var $input = tag.widget().find('input');
 
@@ -10714,6 +12114,2294 @@ var $A = {};
 })();
 
 (function(){
+    var SpecialTagger = function (obj) {
+        var t = this;
+        t.d = {
+            $widget: $('<table cellpadding="0" cellspacing="0" border="0" class="automizy-special-tagger"></table>'),
+            $tr1: $('<tr></tr>'),
+            $tr2: $('<tr></tr>'),
+            $tr3: $('<tr></tr>'),
+            $td1: $('<td class="automizy-special-tagger-td1"></td>'),
+            $td2: $('<td class="automizy-special-tagger-td2"></td>'),
+            $td3: $('<td class="automizy-special-tagger-td3"></td>'),
+
+            $optionsBox: $('<div class="automizy-special-tagger-options-box"></div>'),
+            $options: $('<div class="automizy-special-tagger-options"></div>'),
+            $optionsText: $('<div class="automizy-special-tagger-options-text"></div>'),
+            $optionsLoading: $('<div class="automizy-special-tagger-options-loading"></div>'),
+
+            options: [],
+
+            type:'checkbox',
+
+            onAddTag:function(){},
+
+            searchInput: $A.newInput2({
+                innerIconRight: 'fa fa-search',
+                placeholder: $A.translate('Search for Tags...'),
+                padding: 0,
+                margin: 0,
+                width: '100%',
+                keyup: function () {
+                    var showedLength = 0;
+                    var value = this.val().trim();
+                    if (value.length <= 0) {
+                        if(t.d.options.length <= 0){
+                            t.d.$optionsText.ashow().text($A.translate('no tags...'));
+                            return;
+                        }
+                    } else {
+
+                    }
+                    var re = new RegExp(value, "gi");
+                    for (var i = 0; i < t.d.options.length; i++) {
+                        if (t.d.options[i].search.search(re) >= 0 || t.d.options[i].$checkbox.is(':checked') || t.d.options[i].$radio.is(':checked')) {
+                            t.d.options[i].$widget.ashow();
+                            showedLength++;
+                        } else {
+                            t.d.options[i].$widget.ahide();
+                        }
+                    }
+
+                    t.d.$optionsText.ahide();
+                    if(showedLength <= 0){
+                        t.d.$optionsText.ashow().text($A.translate('no results...'));
+                    }
+
+                }
+            }),
+            newTagInput: $A.newInput2({
+                placeholder: $A.translate('Add New Tag...'),
+                padding: 0,
+                margin: 0,
+                width: '100%',
+                enter: function () {
+                    t.addTagFromInput(this.val());
+                    this.val('');
+                }
+            })
+
+        };
+        t.init();
+
+
+        t.d.$tr1.appendTo(t.d.$widget);
+        t.d.$tr2.appendTo(t.d.$widget);
+        t.d.$tr3.appendTo(t.d.$widget);
+
+        t.d.$td1.appendTo(t.d.$tr1);
+        t.d.$td2.appendTo(t.d.$tr2);
+        t.d.$td3.appendTo(t.d.$tr3);
+
+        t.d.searchInput.drawTo(t.d.$td1);
+
+        t.d.$optionsBox.appendTo(t.d.$td2);
+        t.d.$options.appendTo(t.d.$optionsBox);
+        t.d.$optionsText.appendTo(t.d.$optionsBox);
+        t.d.$optionsLoading.appendTo(t.d.$optionsBox);
+
+        t.d.newTagInput.drawTo(t.d.$td3);
+
+        if (typeof obj !== 'undefined') {
+            if (typeof obj.tagList !== 'undefined') {
+                t.tagList(obj.tagList);
+            }
+            if (typeof obj.value !== 'undefined') {
+                t.val(obj.value);
+            }
+            if (typeof obj.maxHeight !== 'undefined') {
+                t.maxHeight(obj.maxHeight);
+            }
+            if (typeof obj.unique !== 'undefined') {
+                t.unique(obj.unique);
+            }
+            if (typeof obj.maxLength !== 'undefined') {
+                t.maxLength(obj.maxLength);
+            }
+            if (typeof obj.change === 'function') {
+                t.change(obj.change);
+            }
+            if (typeof obj.onAddTag === 'function') {
+                t.onAddTag(obj.onAddTag);
+            }
+            if (typeof obj.type !== 'undefined') {
+                t.type(obj.type);
+            }
+            t.initParameter(obj);
+        }
+
+    };
+
+    var p = SpecialTagger.prototype;
+
+    p.change = function (func, name, life) {
+        var t = this;
+
+        return t;
+    };
+    p.val = p.tags = function (tags) {
+        var t = this;
+        if (typeof tags !== 'undefined') {
+            if(t.type() === 'checkbox') {
+                for (var i = 0; i < t.d.options.length; i++) {
+                    t.d.options[i].$checkbox.prop('checked', (tags.indexOf(t.d.options[i].value) >= 0));
+                }
+            }else if(t.type() === 'radio') {
+                for (var i = 0; i < t.d.options.length; i++) {
+                    if(tags == t.d.options[i].value){
+                        t.d.options[i].$radio.prop('checked', true);
+                        break;
+                    }
+                }
+            }
+            return t;
+        }
+        if(t.type() === 'checkbox') {
+            tags = [];
+            for (var i = 0; i < t.d.options.length; i++) {
+                if (t.d.options[i].$checkbox.is(':checked')) {
+                    tags.push(t.d.options[i].value);
+                }
+            }
+            return tags;
+        }else if(t.type() === 'radio') {
+            tags = '';
+            for (var i = 0; i < t.d.options.length; i++) {
+                if (t.d.options[i].$radio.is(':checked')) {
+                    tags = t.d.options[i].value;
+                    break;
+                }
+            }
+            return tags;
+        }
+    };
+    p.type = function(type){
+        var t = this;
+        if(typeof type !== 'undefined'){
+            t.d.type = type;
+            if(t.d.type === 'checkbox'){
+                for (var i = 0; i < t.d.options.length; i++) {
+                    t.d.options[i].$radio.appendTo($A.$tmp);
+                    t.d.options[i].$checkbox.prependTo(t.d.options[i].$widget);
+                }
+            }else if(t.d.type === 'radio'){
+                for (var i = 0; i < t.d.options.length; i++) {
+                    t.d.options[i].$radio.prependTo(t.d.options[i].$widget);
+                    t.d.options[i].$checkbox.appendTo($A.$tmp);
+                }
+            }
+            return t;
+        }
+        return t.d.type;
+    };
+    p.maxHeight = function (maxHeight) {
+        var t = this;
+        if (typeof maxHeight !== 'undefined') {
+            t.d.maxHeight = maxHeight;
+            t.d.$optionsBox.css('max-height', t.d.maxHeight);
+            return t;
+        }
+        return t.d.maxHeight;
+    };
+    p.onAddTag = function (onAddTag) {
+        var t = this;
+        if (typeof onAddTag !== 'undefined') {
+            t.d.onAddTag = onAddTag;
+            return t;
+        }
+        return t;
+    };
+
+    p.tagList = function (tags) {
+        var t = this;
+        if (typeof tags !== 'undefined') {
+            t.d.options = [];
+            t.d.$options.empty();
+            t.d.$optionsText.ashow().text($A.translate('no tags...'));
+
+            tags.forEach(function (tag) {
+                t.addTagToList(tag);
+            });
+
+            return t;
+        }
+        return t.d.options;
+    };
+
+    p.addTagToList = function (tag, prepend, autoCheck) {
+        var t = this;
+        prepend = prepend || false;
+        autoCheck = autoCheck || false;
+        t.d.$optionsText.ahide();
+
+        var $widget = $('<label class="automizy-special-tagger-tag"></label>');
+        var $checkbox = $('<input type="checkbox" class="automizy-special-tagger-tag-checkbox" />').attr('title', tag);
+        var $radio = $('<input type="radio" name="'+t.id()+'" class="automizy-special-tagger-tag-radio" />').attr('title', tag);
+        var $tag = $('<span class="automizy-special-tagger-tag-label"></span>').text(tag).appendTo($widget).attr('title', tag);
+
+        if(prepend){
+            $widget.prependTo(t.d.$options);
+        }else{
+            $widget.appendTo(t.d.$options);
+        }
+
+        if(t.d.type === 'checkbox'){
+            $radio.appendTo($A.$tmp);
+            $checkbox.prependTo($widget);
+        }else if(t.d.type === 'radio'){
+            $radio.prependTo($widget);
+            $checkbox.appendTo($A.$tmp);
+        }
+
+        if(autoCheck){
+            $checkbox.prop('checked', true);
+            $radio.prop('checked', true);
+        }
+
+        var optionObj = {
+            $widget: $widget,
+            $checkbox: $checkbox,
+            $radio: $radio,
+            $tag: $tag,
+            value: tag,
+            search: tag
+        };
+
+        t.d.options.push(optionObj);
+
+        return t;
+    };
+
+    p.addTagFromInput = function (value) {
+        var t = this;
+        var tag = value.trim();
+        if (tag.length <= 0) {
+            return false;
+        }
+        var tagLower = tag.toLowerCase();
+        for (var i = 0; i < t.d.options.length; i++) {
+            if (t.d.options[i].value.toLowerCase() === tagLower) {
+                t.d.options[i].$checkbox.prop('checked', true);
+                t.d.options[i].$radio.prop('checked', true);
+                return false;
+            }
+        }
+        t.addTagToList(tag, false, true);
+        t.scrollToBottom();
+        t.d.onAddTag.apply(t, [tag]);
+    };
+
+    p.scrollToTop = function(){
+        var t = this;
+        t.d.$optionsBox.scrollTop(0);
+        return t;
+    };
+
+    p.scrollToBottom = function(){
+        var t = this;
+        t.d.$optionsBox.scrollTop(999999);
+        return t;
+    };
+
+    p.loadingOn = function(){
+        var t = this;
+        t.widget().addClass('automizy-line-loading');
+        t.d.newTagInput.disable();
+        return t;
+    };
+    p.loadingOff = function(){
+        var t = this;
+        t.widget().removeClass('automizy-line-loading');
+        t.d.newTagInput.enable();
+        return t;
+    };
+
+
+
+    $A.initBasicFunctions(SpecialTagger, "SpecialTagger", ["change"]);
+})();
+
+(function(){
+    var ColumnContent = function (obj) {
+        var t = this;
+        t.d = {
+            $widget: $('<div class="automizy-column-content"></div>'),
+            width: '100%',
+            height: 'auto',
+
+            opened: false,
+
+            columnsArray: [],
+            columns: {}
+        };
+        t.f = {};
+        t.init();
+
+        if (typeof obj !== 'undefined') {
+            if (typeof obj.width !== 'undefined') {
+                t.width(obj.width);
+            }
+            if (typeof obj.height !== 'undefined') {
+                t.height(obj.height);
+            }
+            if (typeof obj.columns !== 'undefined') {
+                t.columns(obj.columns);
+            }
+            t.initParameter(obj);
+        }
+
+    };
+
+    var p = ColumnContent.prototype;
+
+    p.width = function (width) {
+        var t = this;
+        if (typeof width !== 'undefined') {
+            t.d.width = width;
+            t.widget().css('width', t.d.width);
+            return t;
+        }
+        return t.d.width;
+    };
+    p.height = function (height) {
+        var t = this;
+        if (typeof height !== 'undefined') {
+            t.d.height = height;
+            t.widget().css('height', t.d.height);
+            return t;
+        }
+        return t.d.height;
+    };
+    p.columns = function (columns) {
+        var t = this;
+        t.d.columnsArray = [];
+        t.d.columns = {};
+        columns.forEach(function (column) {
+            var columnModule = $A.newColumnContentColumn(column);
+            t.d.columnsArray.push(columnModule);
+            t.d.columns[column.name || $A.getUniqueString()] = columnModule;
+            columnModule.drawTo(t.d.$widget);
+        });
+        return t;
+    };
+    p.getColumn = function (name) {
+        return this.d.columns[name];
+    };
+
+    $A.initBasicFunctions(ColumnContent, "ColumnContent", []);
+
+
+})();
+
+(function(){
+    var ColumnContentColumn = function (obj) {
+        var t = this;
+        t.d = {
+            $widget: $('<div class="automizy-column-content-column automizy-closed"></div>'),
+            $table: $('<table cellpadding="0" cellspacing="0" border="0" class="automizy-column-content-column-table"></table>'),
+            $trTop:$('<tr class="automizy-column-content-column-tr-top"></tr>'),
+            $tdTop:$('<td class="automizy-column-content-column-td-top"></td>'),
+            $trMiddle:$('<tr class="automizy-column-content-column-tr-middle"></tr>'),
+            $tdMiddle:$('<td class="automizy-column-content-column-td-middle"></td>'),
+            $trBottom:$('<tr class="automizy-column-content-column-tr-bottom"></tr>'),
+            $tdBottom:$('<td class="automizy-column-content-column-td-bottom"></td>'),
+
+            $title:$('<div class="automizy-column-content-column-title"></div>'),
+            $subTitle:$('<div class="automizy-column-content-column-subtitle"></div>'),
+            $content:$('<div class="automizy-column-content-column-content"></div>'),
+            $footerContent:$('<div class="automizy-column-content-column-footer-content"></div>'),
+
+            name:false,
+            title:false,
+            subTitle:false,
+            content:false,
+            footerContent:false
+        };
+        t.f = {};
+        t.init();
+
+
+        t.d.$table.appendTo(t.d.$widget);
+        t.d.$trTop.appendTo(t.d.$table);
+        t.d.$tdTop.appendTo(t.d.$trTop);
+        t.d.$trMiddle.appendTo(t.d.$table);
+        t.d.$tdMiddle.appendTo(t.d.$trMiddle);
+        t.d.$trBottom.appendTo(t.d.$table);
+        t.d.$tdBottom.appendTo(t.d.$trBottom);
+
+        t.d.$title.appendTo(t.d.$tdTop);
+        t.d.$subTitle.appendTo(t.d.$tdTop);
+        t.d.$content.appendTo(t.d.$tdMiddle);
+        t.d.$footerContent.appendTo(t.d.$tdBottom);
+
+
+        if (typeof obj !== 'undefined') {
+            if (typeof obj.name !== 'undefined') {
+                t.name(obj.name);
+            }
+            if (typeof obj.width !== 'undefined') {
+                t.width(obj.width);
+            }
+            if (typeof obj.title !== 'undefined') {
+                t.title(obj.title);
+            }
+            if (typeof obj.subTitle !== 'undefined') {
+                t.subTitle(obj.subTitle);
+            }
+            if (typeof obj.content !== 'undefined') {
+                t.content(obj.content);
+            }
+            if (typeof obj.footerContent !== 'undefined') {
+                t.footerContent(obj.footerContent);
+            }
+            if (typeof obj.columnContentModule !== 'undefined') {
+                t.columnContentModule(obj.columnContentModule);
+            }
+            if (typeof obj.autoOpen !== 'undefined' && obj.autoOpen === true) {
+                t.open(true);
+            }
+            t.initParameter(obj);
+        }
+
+    };
+
+    var p = ColumnContentColumn.prototype;
+
+    p.columnContentModule = function (columnContentModule) {
+        var t = this;
+        if (typeof columnContentModule !== 'undefined') {
+            t.d.columnContentModule = columnContentModule;
+            return t;
+        }
+        return t.d.columnContentModule;
+    };
+    p.name = function (name) {
+        var t = this;
+        if (typeof name !== 'undefined') {
+            t.d.name = name;
+            return t;
+        }
+        return t.d.name;
+    };
+
+    p.width = function (width) {
+        var t = this;
+        if (typeof width !== 'undefined') {
+            t.d.width = width;
+            t.widget().css('width', t.d.width);
+            return t;
+        }
+        return t.d.width;
+    };
+
+    p.content = function (content) {
+        var t = this;
+        if (typeof content !== 'undefined') {
+            if(typeof content === 'boolean'){
+                t.widget().toggleClass('automizy-has-content', content);
+                return t;
+            }
+            if (t.d.$content.contents() instanceof jQuery) {
+                t.d.$content.contents().appendTo($A.$tmp);
+            }
+            t.d.$content.empty();
+            t.d.content = content;
+            if (t.d.content instanceof jQuery) {
+                t.d.content.appendTo(t.d.$content);
+            } else if (typeof t.d.content.drawTo === 'function') {
+                t.d.content.drawTo(t.d.$content);
+            } else {
+                t.d.$content.html(t.d.content);
+            }
+            t.content(true);
+            return t;
+        }
+        return t.d.content;
+    };
+    p.footerContent = function (footerContent) {
+        var t = this;
+        if (typeof footerContent !== 'undefined') {
+            if(typeof footerContent === 'boolean'){
+                t.widget().toggleClass('automizy-has-footer', footerContent);
+                return t;
+            }
+            if (t.d.$footerContent.contents() instanceof jQuery) {
+                t.d.$footerContent.contents().appendTo($A.$tmp);
+            }
+            t.d.$footerContent.empty();
+            t.d.footerContent = footerContent;
+            if (t.d.footerContent instanceof jQuery) {
+                t.d.footerContent.appendTo(t.d.$footerContent);
+            } else if (typeof t.d.footerContent.drawTo === 'function') {
+                t.d.footerContent.drawTo(t.d.$footerContent);
+            } else {
+                t.d.$footerContent.html(t.d.footerContent);
+            }
+            t.footerContent(true);
+            return t;
+        }
+        return t.d.footerContent;
+    };
+
+    p.title = function (title) {
+        var t = this;
+        if (typeof title !== 'undefined') {
+            if(typeof title === 'boolean'){
+                t.widget().toggleClass('automizy-has-title', title);
+                return t;
+            }
+            t.d.title = title;
+            t.d.$title.html(title);
+            t.title(true);
+            return t;
+        }
+        return t.d.title;
+    };
+    p.subTitle = function (subTitle) {
+        var t = this;
+        if (typeof subTitle !== 'undefined') {
+            if(typeof subTitle === 'boolean'){
+                t.widget().toggleClass('automizy-has-subtitle', subTitle);
+                return t;
+            }
+            t.d.subTitle = subTitle;
+            t.d.$subTitle.html(subTitle);
+            t.subTitle(true);
+            return t;
+        }
+        return t.d.subTitle;
+    };
+
+    p.opened = function (opened) {
+        var t = this;
+        if(typeof opened !== 'undefined'){
+            t.d.opened = $A.parseBoolean(opened);
+            return t;
+        }
+        return t.d.opened;
+    };
+
+    p.open = function (force) {
+        var t = this;
+        force = force || false;
+        t.opened(true);
+        if(force){
+            t.widget().addClass('automizy-disable-animate');
+        }
+        t.widget().removeClass('automizy-closed');
+        if(force){
+            t.widget().removeClass('automizy-disable-animate');
+        }
+        return t;
+    };
+    p.close = function (force) {
+        var t = this;
+        force = force || false;
+        t.opened(false);
+        if(force){
+            t.widget().addClass('automizy-disable-animate');
+        }
+        t.widget().addClass('automizy-closed');
+        if(force){
+            t.widget().removeClass('automizy-disable-animate');
+        }
+        return t;
+    };
+
+
+    $A.initBasicFunctions(ColumnContentColumn, "ColumnContentColumn", []);
+
+
+})();
+
+(function(){
+    var Mockup = function (obj) {
+        var t = this;
+        t.d = {
+            $widget: $('<div class="automizy-mockup"></div>'),
+            $device: $('<div class="automizy-mockup-device"></div>'),
+            $deviceImage: $('<img src="" class="automizy-mockup-device-image" />'),
+            $loading:$('<div class="automizy-mockup-loading"></div>'),
+            $iframe: $('<iframe class="automizy-mockup-iframe" scrolling="no"></iframe>'),
+
+            deviceType: 'default-tablet-portrait',
+            scrolling:false,
+            zoom:false,
+            minHeight:'auto',
+            minWidth:'auto',
+            content:'',
+            emptyContent:'',
+            oldScrollTop:0,
+            actuallyScrollTop:0,
+            id: 'automizy-mockup-' + $A.getUniqueString()
+        };
+        t.f = {};
+        t.init();
+
+        t.d.$device.appendTo(t.d.$widget);
+        t.d.$deviceImage.appendTo(t.d.$device);
+        t.d.$iframe.appendTo(t.d.$device);
+        t.d.$loading.appendTo(t.d.$device);
+        t.loadingOff();
+        if (typeof obj !== 'undefined') {
+            if (typeof obj.deviceType !== 'undefined') {
+                t.deviceType(obj.deviceType);
+            }
+            if (typeof obj.content !== 'undefined') {
+                t.content(obj.content);
+            }
+            if (typeof obj.emptyContent !== 'undefined') {
+                t.emptyContent(obj.emptyContent);
+            }
+            if (typeof obj.zoom !== 'undefined') {
+                t.zoom(obj.zoom);
+            }
+            if (typeof obj.scrolling !== 'undefined') {
+                t.scrolling(obj.scrolling);
+            }
+            if (typeof obj.minWidth !== 'undefined') {
+                t.minWidth(obj.minWidth);
+            }
+            if (typeof obj.minHeight !== 'undefined') {
+                t.minHeight(obj.minHeight);
+            }
+            if (typeof obj.ratioForWidth !== 'undefined') {
+                if(obj.ratioForWidth){
+                    t.ratioForWidth();
+                }else{
+                    t.ratioForHeight();
+                }
+            }
+            t.initParameter(obj);
+        }
+
+    };
+
+    var p = Mockup.prototype;
+    p.deviceType = function (deviceType) {
+        var t = this;
+        if (typeof deviceType !== 'undefined') {
+            t.d.deviceType = deviceType;
+            t.widget().removeClassPrefix('automizy-mockup-device-type-').addClass('automizy-mockup-device-type-' + deviceType);
+            t.d.$deviceImage.attr('src', 'images/mockup/'+deviceType+'.svg');
+            return t;
+        }
+        return t.d.deviceType;
+    };
+    p.content = function (content) {
+        var t = this;
+        if (typeof content !== 'undefined') {
+            t.d.content = content;
+            var style = 'body,html{margin:0;padding:0} ';
+            if(t.zoom() !== false){
+                var zoom = t.zoom();
+                var width = 100/zoom;
+                var height = 100*zoom;
+                style += 'body{transform-origin: top left;width:'+width+'%;height:'+height+'%;transform: scale('+zoom+');} ';
+            }
+            setTimeout(function(){
+                if(t.d.content.trim().length <= 0){
+                    t.iframeDocument().html('<!DOCTYPE html>' + t.emptyContent() + '<style>body,html{margin:0;padding:0}</style>');
+                }else {
+                    t.iframeDocument().html('<!DOCTYPE html>' + t.d.content + '<style>' + style + '</style>');
+                    $(t.contentWindow()).on('mousewheel', function(event){
+                        if(!t.scrolling()){
+                            return;
+                        }
+                        var $t = $(this);
+                        var scrollTop = $t.scrollTop();
+                        var scrollStep = 45;
+                        if(event.originalEvent.wheelDelta /120 > 0) {
+                            scrollTop -= scrollStep;
+                        } else{
+                            scrollTop += scrollStep;
+                        }
+                        $t.scrollTop(scrollTop);
+
+                        //t.d.actuallyScrollTop = $t.scrollTop();
+                        //if(t.d.actuallyScrollTop !== t.d.oldScrollTop){
+                            event.preventDefault();
+                        //}
+                        //t.d.oldScrollTop = $t.scrollTop();
+                    });
+                }
+            }, 10);
+            return t;
+        }
+        return t.d.content;
+    };
+    p.emptyContent = function (emptyContent) {
+        var t = this;
+        if (typeof emptyContent !== 'undefined') {
+            t.d.emptyContent = emptyContent;
+            return t;
+        }
+        return t.d.emptyContent;
+    };
+    p.contentWindow = function () {
+        var t = this;
+        return t.d.$iframe[0].contentWindow;
+    };
+    p.iframeDocument = function () {
+        var t = this;
+        return $('body', t.contentWindow().document);
+    };
+    p.scrolling = function (scrolling) {
+        var t = this;
+        if(typeof scrolling !== 'undefined'){
+            t.d.scrolling = $A.parseBoolean(scrolling);
+            return t;
+        }
+        return t.d.scrolling;
+    };
+    p.zoom = function (zoom) {
+        var t = this;
+        if(typeof zoom !== 'undefined'){
+            t.d.zoom = zoom;
+            return t;
+        }
+        return t.d.zoom;
+    };
+    p.minWidth = function (minWidth) {
+        var t = this;
+        if(typeof minWidth !== 'undefined'){
+            t.d.minWidth = minWidth;
+            t.d.$deviceImage.css('min-width', t.d.minWidth);
+            return t;
+        }
+        return t.d.minWidth;
+    };
+    p.minHeight = function (minHeight) {
+        var t = this;
+        if(typeof minHeight !== 'undefined'){
+            t.d.minHeight = minHeight;
+            t.d.$deviceImage.css('min-height', t.d.minHeight);
+            return t;
+        }
+        return t.d.minHeight;
+    };
+    p.loadingOn = function () {
+        var t = this;
+        t.d.$loading.ashow();
+        t.d.$iframe.ahide();
+        return t;
+    };
+    p.loadingOff = function () {
+        var t = this;
+        t.d.$loading.ahide();
+        t.d.$iframe.ashow();
+        return t;
+    };
+    p.ratioForWidth = function () {
+        var t = this;
+        t.widget().addClass('ratio-for-width');
+        return t;
+    };
+    p.ratioForHeight = function () {
+        var t = this;
+        t.widget().removeClass('ratio-for-width');
+        return t;
+    };
+
+
+    $A.initBasicFunctions(Mockup, "Mockup", []);
+
+
+    $(document).on('mousewheel DOMMouseScroll', function(event) {
+        if(!$(event.target).closest('.automizy-button-dropdown-menu').length) {
+            $A.closeAllButtonMenu();
+        }
+    });
+
+})();
+
+(function(){
+    var Content = function (obj) {
+        var t = this;
+        t.d = {
+            $widget: $('<div class="automizy-content"></div>'),
+            $navigationBox: $('<div class="automizy-content-navigation-box"></div>'),
+            $content: $('<div class="automizy-content-content"></div>'),
+
+            title:'',
+            content:'',
+            width:'auto',
+            id: 'automizy-content-' + $A.getUniqueString()
+        };
+        t.f = {};
+        t.init();
+
+        t.d.$content.appendTo(t.d.$widget);
+        if (typeof obj !== 'undefined') {
+
+            if (typeof obj.title !== 'undefined') {
+                t.title(obj.title);
+            }
+            if (typeof obj.content !== 'undefined') {
+                t.content(obj.content);
+            }
+
+            t.initParameter(obj);
+        }
+
+    };
+
+    var p = Content.prototype;
+    p.width = function (width) {
+        var t = this;
+        if (typeof width !== 'undefined') {
+            t.d.width = width;
+            t.d.$content.css('max-width', t.d.width);
+            return t;
+        }
+        return t.d.width;
+    };
+    p.content = function (content) {
+        var t = this;
+        if (typeof content !== 'undefined') {
+            if (t.d.$content.contents() instanceof jQuery) {
+                t.d.$content.contents().appendTo($A.$tmp);
+            }
+            t.d.$content.empty();
+            t.d.content = content;
+            if (t.d.content instanceof jQuery) {
+                t.d.content.appendTo(t.d.$content);
+            } else if(typeof t.d.content.drawTo === 'function') {
+                t.d.content.drawTo(t.d.$content);
+            } else {
+                t.d.$content.html(t.d.content);
+            }
+            return t;
+        }
+        return t.d.content;
+    };
+
+
+    $A.initBasicFunctions(Content, "Content", []);
+
+
+})();
+
+(function(){
+    var CustomFieldFilter = function (obj) {
+        var t = this;
+        t.d = {
+            $widget: $('<div class="automizy-custom-field-filter"></div>'),
+            $filterButtons: $('<div class="automizy-custom-field-filter-filter-buttons"></div>'),
+            $customFieldSelect: $('<div class="automizy-custom-field-filter-custom-field-select-box"></div>'),
+            $customFieldSelectInputBox: $('<div class="automizy-custom-field-filter-custom-field-select-input-box"></div>'),
+            $customFieldSelectLabel: $('<div class="automizy-custom-field-filter-custom-field-select-label"></div>'),
+            $relationAndValue: $('<div class="automizy-custom-field-filter-relation-and-value"></div>'),
+            $relationInput: $('<div class="automizy-custom-field-filter-relation"></div>'),
+            $valueInput: $('<div class="automizy-custom-field-filter-value"></div>'),
+            id: 'automizy-custom-field-filter-' + $A.getUniqueString(),
+
+            type:false,
+
+            relations:{
+                text:[
+                    ['EQ', $A.translate('is')],
+                    ['NE', $A.translate('is not')],
+                    ['IN', $A.translate('contains')],
+                    ['NI', $A.translate('does not contain')]
+                ],
+                date:[
+                    ['EQ', $A.translate('on the')],
+                    ['NE', $A.translate('not on')],
+                    ['GT', $A.translate('before')],
+                    ['LT', $A.translate('after')]
+                ],
+                number:[
+                    ['EQ', $A.translate('equals')],
+                    ['NE', $A.translate('not equals')],
+                    ['GT', $A.translate('less than')],
+                    ['LT', $A.translate('greater than')]
+                ]
+            },
+            customFields:[],
+
+            customFieldSelect:$A.newInput2({
+                type:'select',
+                change:function(){
+                    var selectedOption = this.automizySelect().selectedOption();
+                    if(!!selectedOption) {
+                        t.type(this.automizySelect().selectedOption().data('type'));
+                    }
+                }
+            }),
+
+            relationSelect:$A.newInput2({
+                type:'select',
+                width:'180px'
+            }),
+
+            valueInputText:$A.newInput2({
+                type:'text'
+            }),
+
+            valueInputDate:$A.newInput2({
+                type:'text',
+                create:function(){
+                    if (typeof $.ui !== 'undefined') {
+                        this.input().datepicker({
+                            dateFormat: 'yy-mm-dd',
+                            closeText: $A.translate('Save')
+                        })
+                    }else{
+                        this.type('date');
+                    }
+                }
+            }),
+
+            valueInputNumber:$A.newInput2({
+                type:'number'
+            }),
+
+            change: function () {
+                if (t.change().returnValue() === false) {
+                    return false;
+                }
+            }
+        };
+
+        t.d.$filterButtons.appendTo(t.d.$widget);
+        t.d.$customFieldSelect.appendTo(t.d.$widget);
+        t.d.$customFieldSelectInputBox.appendTo(t.d.$customFieldSelect);
+        t.d.$customFieldSelectLabel.appendTo(t.d.$customFieldSelect);
+
+        t.d.$relationAndValue.appendTo(t.d.$widget);
+        t.d.$relationInput.appendTo(t.d.$relationAndValue);
+        t.d.$valueInput.appendTo(t.d.$relationAndValue);
+
+        t.d.customFieldSelect.drawTo(t.d.$customFieldSelectInputBox);
+        t.d.relationSelect.drawTo(t.d.$relationInput);
+        t.d.valueInputText.drawTo(t.d.$valueInput);
+        t.d.valueInputDate.drawTo(t.d.$valueInput);
+        t.d.valueInputNumber.drawTo(t.d.$valueInput);
+
+        t.d.relationSelect.automizySelect().hasCheck(false);
+
+        t.f = {};
+        t.init();
+
+        t.type(false);
+
+        if (typeof obj !== 'undefined') {
+            if (typeof obj.customFields !== 'undefined') {
+                t.customFields(obj.customFields);
+            }
+            t.initParameter(obj);
+        }
+    };
+
+    var p = CustomFieldFilter.prototype;
+
+    p.customFieldId = function (customFieldId) {
+        var t = this;
+        if (typeof customFieldId !== 'undefined') {
+            t.d.customFieldId = customFieldId;
+            t.d.customFieldSelect.automizySelect().val(t.d.customFieldId);
+            if(!t.d.customFieldId){
+                t.d.valueInputText.val('');
+                t.d.valueInputDate.val('');
+                t.d.valueInputNumber.val(0);
+            }
+            return t;
+        }
+        return t.d.customFieldSelect.automizySelect().val();
+    };
+    p.customFields = function (customFields) {
+        var t = this;
+        if (typeof customFields !== 'undefined') {
+            t.d.customFields = customFields;
+            var options = [];
+            t.d.customFields.forEach(function(cf){
+                option = {
+                    value:cf.value,
+                    html:cf.text,
+                    data:{
+                        type:cf.type
+                    }
+                };
+                if(typeof cf.group !== 'undefined'){
+                    option.group = cf.group;
+                }
+                options.push(option);
+            });
+            t.d.customFieldSelect.automizySelect().options(options);
+            return t;
+        }
+        return t.d.customFields;
+    };
+    p.loadingStart = function () {
+        var t = this;
+        t.type(false);
+        t.d.customFieldSelect.automizySelect().loadingStart();
+        return t;
+    };
+    p.loadingStop = function () {
+        var t = this;
+        t.d.customFieldSelect.automizySelect().loadingStop();
+        return t;
+    };
+    p.relation = function (relation) {
+        var t = this;
+        if (typeof relation !== 'undefined') {
+            t.d.relation = relation;
+            t.d.relationSelect.automizySelect().val(t.d.relation);
+            return t;
+        }
+        return t.d.relationSelect.automizySelect().val();
+    };
+    p.relationOptions = function (relationOptions) {
+        var t = this;
+        if (typeof relation !== 'undefined') {
+            t.d.relationSelect.automizySelect().options(relationOptions);
+            return t;
+        }
+        return t.d.relationSelect.automizySelect().options();
+    };
+    p.val = p.value = function (value) {
+        var t = this;
+        var type = t.type();
+        if (typeof value !== 'undefined') {
+            if(type === 'text'){
+                t.d.valueInputText.val(value);
+            }else if(type === 'date'){
+                t.d.valueInputDate.val(value);
+            }else if(type === 'number'){
+                t.d.valueInputNumber.val(value);
+            }
+            return t;
+        }
+
+        if(type === 'text'){
+            return t.d.valueInputText.val();
+        }else if(type === 'date'){
+            return t.d.valueInputDate.val();
+        }else if(type === 'number'){
+            return t.d.valueInputNumber.val();
+        }
+
+        return false;
+    };
+    p.type = function (type) {
+        var t = this;
+        if (typeof type !== 'undefined') {
+            t.d.type = type;
+
+            t.d.valueInputText.hide();
+            t.d.valueInputDate.hide();
+            t.d.valueInputNumber.hide();
+            t.d.relationSelect.show();
+
+            if(t.d.type === 'text'){
+                t.d.valueInputText.show();
+                t.d.relationSelect.options(t.d.relations.text);
+                t.d.$customFieldSelectLabel.text($A.translate('custom field'));
+            }else if(t.d.type === 'date'){
+                t.d.valueInputDate.show();
+                t.d.relationSelect.options(t.d.relations.date);
+                t.d.$customFieldSelectLabel.text($A.translate('custom field is'));
+            }else if(t.d.type === 'number'){
+                t.d.valueInputNumber.show();
+                t.d.relationSelect.options(t.d.relations.number);
+                t.d.$customFieldSelectLabel.text($A.translate('custom field is'));
+            }else if(!t.d.type){
+                t.d.relationSelect.hide();
+                t.d.$customFieldSelectLabel.text($A.translate('custom field'));
+            }
+
+            return t;
+        }
+        return t.d.type;
+    };
+    p.change = function (func, name, life) {
+        var t = this;
+        if (typeof func === 'function') {
+            t.addFunction('change', func, name, life);
+        } else {
+            var a = t.runFunctions('change');
+            t.returnValue(!(t.disabled() === true || a[0] === false || a[1] === false));
+        }
+        return t;
+    };
+
+    p.drawTo = p.draw = p.appendTo = function ($target) {
+        var t = this;
+        $target = $target || $('body');
+        t.d.$widget.appendTo($target);
+        return t;
+    };
+    p.show = function () {
+        var t = this;
+        this.d.$widget.ashow();
+        return t;
+    };
+    p.hide = function () {
+        var t = this;
+        this.d.$widget.ahide();
+        return t;
+    };
+    p.disabled = function(){
+        return false;
+    };
+
+
+    $A.initBasicFunctions(CustomFieldFilter, "CustomFieldFilter", ['change']);
+
+
+})();
+
+(function(){
+    var CustomFieldUpdater = function (obj) {
+        var t = this;
+        t.d = {
+            $widget: $('<div class="automizy-custom-field-updater"></div>'),
+            $filterButtons: $('<div class="automizy-custom-field-updater-filter-buttons"></div>'),
+            $customFieldSelect: $('<div class="automizy-custom-field-updater-custom-field-select-box"></div>'),
+            $customFieldSelectInputBox: $('<div class="automizy-custom-field-updater-custom-field-select-input-box"></div>'),
+            $customFieldSelectLabel: $('<div class="automizy-custom-field-updater-custom-field-select-label"></div>'),
+            $valueLabel: $('<div class="automizy-custom-field-updater-value-label"></div>'),
+            $valueBox: $('<div class="automizy-custom-field-updater-value-box"></div>'),
+            $valueInput: $('<div class="automizy-custom-field-updater-value"></div>'),
+            id: 'automizy-custom-field-updater-' + $A.getUniqueString(),
+
+            type:false,
+
+            customFields:[],
+
+            customFieldSelect:$A.newInput2({
+                type:'select',
+                change:function(){
+                    var selectedOption = this.automizySelect().selectedOption();
+                    if(!!selectedOption) {
+                        t.type(this.automizySelect().selectedOption().data('type'));
+                    }
+                }
+            }),
+
+            valueInputText:$A.newInput2({
+                type:'text'
+            }),
+
+            valueInputDate:$A.newInput2({
+                type:'text',
+                create:function(){
+                    if (typeof $.ui !== 'undefined') {
+                        this.input().datepicker({
+                            dateFormat: 'yy-mm-dd',
+                            closeText: $A.translate('Save')
+                        })
+                    }else{
+                        this.type('date');
+                    }
+                }
+            }),
+
+            valueInputNumber:$A.newInput2({
+                type:'number'
+            }),
+
+            change: function () {
+                if (t.change().returnValue() === false) {
+                    return false;
+                }
+            }
+        };
+
+        t.d.$customFieldSelect.appendTo(t.d.$widget);
+        t.d.$customFieldSelectInputBox.appendTo(t.d.$customFieldSelect);
+        t.d.$customFieldSelectLabel.appendTo(t.d.$customFieldSelect).text($A.translate('custom field'));
+
+        t.d.$valueBox.appendTo(t.d.$widget);
+        t.d.$valueLabel.appendTo(t.d.$valueBox);
+        t.d.$valueInput.appendTo(t.d.$valueBox);
+
+        t.d.customFieldSelect.drawTo(t.d.$customFieldSelectInputBox);
+        t.d.valueInputText.drawTo(t.d.$valueInput);
+        t.d.valueInputDate.drawTo(t.d.$valueInput);
+        t.d.valueInputNumber.drawTo(t.d.$valueInput);
+
+        t.f = {};
+        t.init();
+
+        t.type(false);
+
+        if (typeof obj !== 'undefined') {
+            if (typeof obj.customFields !== 'undefined') {
+                t.customFields(obj.customFields);
+            }
+            t.initParameter(obj);
+        }
+    };
+
+    var p = CustomFieldUpdater.prototype;
+
+    p.customFieldId = function (customFieldId) {
+        var t = this;
+        if (typeof customFieldId !== 'undefined') {
+            t.d.customFieldId = customFieldId;
+            t.d.customFieldSelect.automizySelect().val(t.d.customFieldId);
+            if(!t.d.customFieldId){
+                t.d.valueInputText.val('');
+                t.d.valueInputDate.val('');
+                t.d.valueInputNumber.val(0);
+            }
+            return t;
+        }
+        return t.d.customFieldSelect.automizySelect().val();
+    };
+    p.customFields = function (customFields) {
+        var t = this;
+        if (typeof customFields !== 'undefined') {
+            t.d.customFields = customFields;
+            var options = [];
+            var option = {};
+            t.d.customFields.forEach(function(cf){
+                option = {
+                    value:cf.value,
+                    html:cf.text,
+                    data:{
+                        type:cf.type
+                    }
+                };
+                if(typeof cf.group !== 'undefined'){
+                    option.group = cf.group;
+                }
+                options.push(option);
+            });
+            t.d.customFieldSelect.automizySelect().options(options);
+            return t;
+        }
+        return t.d.customFields;
+    };
+    p.loadingStart = function () {
+        var t = this;
+        t.type(false);
+        t.d.customFieldSelect.automizySelect().loadingStart();
+        return t;
+    };
+    p.loadingStop = function () {
+        var t = this;
+        t.d.customFieldSelect.automizySelect().loadingStop();
+        return t;
+    };
+    p.val = p.value = function (value) {
+        var t = this;
+        var type = t.type();
+        if (typeof value !== 'undefined') {
+            if(type === 'text'){
+                t.d.valueInputText.val(value);
+            }else if(type === 'date'){
+                t.d.valueInputDate.val(value);
+            }else if(type === 'number'){
+                t.d.valueInputNumber.val(value);
+            }
+            return t;
+        }
+
+        if(type === 'text'){
+            return t.d.valueInputText.val();
+        }else if(type === 'date'){
+            return t.d.valueInputDate.val();
+        }else if(type === 'number'){
+            return t.d.valueInputNumber.val();
+        }
+
+        return false;
+    };
+    p.type = function (type) {
+        var t = this;
+        if (typeof type !== 'undefined') {
+            t.d.type = type;
+
+            t.d.valueInputText.hide();
+            t.d.valueInputDate.hide();
+            t.d.valueInputNumber.hide();
+            t.d.$valueLabel.show();
+
+            if(t.d.type === 'text'){
+                t.d.valueInputText.show();
+                t.d.$valueLabel.text('with this text:');
+            }else if(t.d.type === 'date'){
+                t.d.valueInputDate.show();
+                t.d.$valueLabel.text('with this date:');
+            }else if(t.d.type === 'number'){
+                t.d.valueInputNumber.show();
+                t.d.$valueLabel.text('with this number:');
+            }else if(!t.d.type){
+                t.d.$valueLabel.hide();
+            }
+
+            return t;
+        }
+        return t.d.type;
+    };
+    p.change = function (func, name, life) {
+        var t = this;
+        if (typeof func === 'function') {
+            t.addFunction('change', func, name, life);
+        } else {
+            var a = t.runFunctions('change');
+            t.returnValue(!(t.disabled() === true || a[0] === false || a[1] === false));
+        }
+        return t;
+    };
+
+    p.drawTo = p.draw = p.appendTo = function ($target) {
+        var t = this;
+        $target = $target || $('body');
+        t.d.$widget.appendTo($target);
+        return t;
+    };
+    p.show = function () {
+        var t = this;
+        this.d.$widget.ashow();
+        return t;
+    };
+    p.hide = function () {
+        var t = this;
+        this.d.$widget.ahide();
+        return t;
+    };
+    p.disabled = function(){
+        return false;
+    };
+
+
+    $A.initBasicFunctions(CustomFieldUpdater, "CustomFieldUpdater", ['change']);
+
+
+})();
+
+(function(){
+    var List = function (obj) {
+        var t = this;
+        t.d = {
+            $widget: $('<div class="automizy-list"></div>'),
+            $title: $('<div class="automizy-list-title"></div>'),
+            $elements: $('<div class="automizy-list-elements"></div>'),
+            $errorContent:$('<div class="automizy-list-error-content"></div>'),
+            $emptySearchContent:$('<div class="automizy-list-empty-search-content"></div>'),
+            $loading:$('<div class="automizy-list-loading"></div>'),
+            moreButton:$A.newButton({
+                skin:'nobox-blue',
+                click:function(){
+                    this.hide();
+                    t.elements().forEach(function(element){
+                        if(!element.d.hideBySearch) {
+                            element.show();
+                        }
+                    });
+                    t.d.isMoreOpened = true;
+                }
+            }),
+
+            title: false,
+            type: 'simple',
+            maxHeight:'100%',
+            minHeight:0,
+
+            maxVisibleElement:false,
+            isMoreOpened:false,
+            moreText:$A.translate('%s more'),
+
+            elements: [],
+
+            elementClick:function(){}
+        };
+        t.f = {};
+        t.init();
+
+        t.d.$title.appendTo(t.d.$widget);
+        t.d.$errorContent.appendTo(t.d.$widget).ahide();
+        t.d.$emptySearchContent.appendTo(t.d.$widget).ahide();
+        t.d.$elements.appendTo(t.d.$widget);
+        t.d.moreButton.appendTo(t.d.$widget).hide();
+        t.d.$loading.appendTo(t.d.$widget);
+        t.loadingOff();
+
+        if (typeof obj !== 'undefined') {
+            if (typeof obj.title !== 'undefined') {
+                t.title(obj.title);
+            }
+            if (typeof obj.maxHeight !== 'undefined') {
+                t.maxHeight(obj.maxHeight);
+            }
+            if (typeof obj.minHeight !== 'undefined') {
+                t.minHeight(obj.minHeight);
+            }
+            if (typeof obj.type !== 'undefined') {
+                t.type(obj.type);
+            }
+            if (typeof obj.errorContent !== 'undefined') {
+                t.errorContent(obj.errorContent);
+            }
+            if (typeof obj.emptySearchContent !== 'undefined') {
+                t.emptySearchContent(obj.emptySearchContent);
+            }
+            if (typeof obj.maxVisibleElement !== 'undefined') {
+                t.maxVisibleElement(obj.maxVisibleElement);
+            }
+            if (typeof obj.moreText !== 'undefined') {
+                t.moreText(obj.moreText);
+            }
+            if (typeof obj.elements !== 'undefined') {
+                t.elements(obj.elements);
+            }
+            if (typeof obj.elementClick !== 'undefined') {
+                t.elementClick(obj.elementClick);
+            }
+            t.initParameter(obj);
+        }
+
+    };
+
+    var p = List.prototype;
+
+    p.maxHeight = function (maxHeight) {
+        var t = this;
+        if (typeof maxHeight !== 'undefined') {
+            t.d.maxHeight = maxHeight;
+            //t.widget().css('max-height', t.d.maxHeight);
+            t.d.$elements.css('max-height', t.d.maxHeight);
+            return t;
+        }
+        return t.d.maxHeight;
+    };
+    p.minHeight = function (minHeight) {
+        var t = this;
+        if (typeof minHeight !== 'undefined') {
+            t.d.minHeight = minHeight;
+            t.widget().css('min-height', t.d.minHeight);
+            //t.d.$elements.css('min-height', t.d.minHeight);
+            return t;
+        }
+        return t.d.minHeight;
+    };
+    p.title = function (title) {
+        var t = this;
+        if (typeof title !== 'undefined') {
+            if(typeof title === 'boolean'){
+                t.widget().toggleClass('automizy-has-title', title);
+                return t;
+            }
+            t.widget().addClass('automizy-has-title');
+            t.d.title = title;
+            t.d.$title.html(title);
+            return t;
+        }
+        return t.d.title;
+    };
+    p.search = function (searchValue) {
+        var t = this;
+        if(typeof searchValue === 'undefined'){
+            searchValue = '';
+        }else if(typeof searchValue === 'boolean' || typeof searchValue === 'object'){
+            searchValue = '';
+        }
+        var re = new RegExp(searchValue.trim(), "gi");
+        var searchCount = 0;
+        t.elements().forEach(function (element) {
+            if (element.search().search(re) >= 0) {
+                element.show();
+                element.d.hideBySearch = false;
+                searchCount++;
+            } else {
+                element.d.hideBySearch = true;
+                element.hide();
+            }
+        });
+        t.refreshVisibleElements();
+        if(searchCount <= 0){
+            t.showEmptySearchContent();
+        }else{
+            t.hideEmptySearchContent();
+        }
+        return searchCount;
+    };
+    p.emptySearchContent = function (content) {
+        var t = this;
+        if (typeof content !== 'undefined') {
+            $A.setContent(content, t.d.$emptySearchContent);
+            return t;
+        }
+        return t;
+    };
+    p.showEmptySearchContent = function () {
+        var t = this;
+        t.d.$emptySearchContent.ashow();
+        return t;
+    };
+    p.hideEmptySearchContent = function () {
+        var t = this;
+        t.d.$emptySearchContent.ahide();
+        return t;
+    };
+    p.errorContent = function (content) {
+        var t = this;
+        if (typeof content !== 'undefined') {
+            $A.setContent(content, t.d.$errorContent);
+            return t;
+        }
+        return t;
+    };
+    p.showErrorContent = function () {
+        var t = this;
+        t.d.$errorContent.ashow();
+        return t;
+    };
+    p.hideErrorContent = function () {
+        var t = this;
+        t.d.$errorContent.ahide();
+        return t;
+    };
+    p.type = function (type) {
+        var t = this;
+        if (typeof type !== 'undefined') {
+            t.d.type = type;
+            return t;
+        }
+        return t.d.type;
+    };
+    p.maxVisibleElement = function (maxVisibleElement) {
+        var t = this;
+        if (typeof maxVisibleElement !== 'undefined') {
+            t.d.maxVisibleElement = maxVisibleElement;
+            return t;
+        }
+        return t.d.maxVisibleElement;
+    };
+    p.moreText = function (moreText) {
+        var t = this;
+        if (typeof moreText !== 'undefined') {
+            t.d.moreText = moreText;
+            t.refreshMore();
+            return t;
+        }
+        return t.d.moreText;
+    };
+    p.refreshMore = function (count) {
+        var t = this;
+        var maxVisibleElement = t.maxVisibleElement();
+        if(maxVisibleElement === false){
+            t.d.moreButton.hide();
+            t.d.isMoreOpened = true;
+            return t;
+        }
+        if(typeof count === 'undefined'){
+            count = t.d.elements.length;
+        }
+        var moreCount = (count) - t.maxVisibleElement();
+        if(moreCount <= 0){
+            t.d.moreButton.hide();
+            t.d.isMoreOpened = true;
+        }else{
+            t.d.moreButton.text(t.moreText().replace("%s", moreCount)).show();
+            t.d.isMoreOpened = false;
+        }
+        return t;
+    };
+    p.refreshVisibleElements = function (count) {
+        var t = this;
+        var maxVisibleElement = t.maxVisibleElement();
+        if(maxVisibleElement === false){
+            return t;
+        }
+        var elementsLength = 0;
+        t.activeElements().forEach(function(element){
+            if(!element.d.hideBySearch){
+                elementsLength++;
+                if(elementsLength > maxVisibleElement){
+                    element.hide();
+                }else{
+                    element.show();
+                }
+            }
+        });
+        t.refreshMore(elementsLength);
+
+        return t;
+    };
+    p.elementClick = function (elementClick) {
+        var t = this;
+        if (typeof elementClick !== 'undefined') {
+            t.d.elementClick = elementClick;
+            return t;
+        }
+        return t.d.elementClick;
+    };
+    p.inactivateAllElement = function () {
+        var t = this;
+        t.elements().forEach(function(element){
+            element.inactivate();
+        });
+        return t.d.type;
+    };
+    p.removeAllElement = function () {
+        var t = this;
+        t.elements().forEach(function(element){
+            element.remove();
+        });
+        return t.d.type;
+    };
+    p.elements = function (elements) {
+        var t = this;
+        if(typeof elements !== 'undefined') {
+            t.removeAllElement();
+            t.d.elements = [];
+            elements.forEach(function (element) {
+                t.addElement(element);
+            });
+            return t;
+        }
+        return t.d.elements;
+    };
+    p.activeElements = function () {
+        var t = this;
+        var elements = [];
+        t.d.elements.forEach(function (element) {
+            if(!element.d.removed){
+                elements.push(element);
+            }
+        });
+        return elements;
+    };
+    p.addElement = function (element, where) {
+        var t = this;
+        if(typeof element !== 'undefined') {
+            var elementModule;
+            if(element === 'separator'){
+                $('<div class="automizy-list-element-separator"></div>').appendTo(t.d.$elements);
+            }else {
+                element.listModule = t;
+                element.type = element.type || t.type() || 'simple';
+                if (element.type === 'simple') {
+                    elementModule = $A.newSimpleListElement(element);
+                } else if (element.type === 'title-and-subtitle') {
+                    elementModule = $A.newTitleAndSubTitleListElement(element);
+                } else if (element.type === 'box') {
+                    elementModule = $A.newBoxListElement(element);
+                } else if (element.type === 'iconed') {
+                    elementModule = $A.newIconedListElement(element);
+                } else if (element.type === 'row') {
+                    elementModule = $A.newRowListElement(element);
+                }
+                t.d.elements.push(elementModule);
+                if(typeof where !== 'undefined'){
+                    elementModule.drawTo(t.d.$elements, where);
+                }else {
+                    elementModule.drawTo(t.d.$elements);
+                }
+
+                t.refreshVisibleElements();
+
+            }
+        }
+        return t;
+    };
+
+    p.loadingOn = function () {
+        var t = this;
+        t.d.$loading.ashow();
+        t.d.$elements.ahide();
+        return t;
+    };
+    p.loadingOff = function () {
+        var t = this;
+        t.d.$loading.ahide();
+        t.d.$elements.ashow();
+        return t;
+    };
+
+
+    $A.initBasicFunctions(List, "List", []);
+
+
+})();
+
+(function(){
+    var ListElement = function (obj) {
+        var t = this;
+        t.d = {
+            $widget: $('<div class="automizy-list-element"></div>'),
+            listModule:false,
+            removed:false,
+            enabled:true,
+            clickInside:false,
+            activateIfClick:true,
+            hideBySearch:false,
+            search:''
+        };
+        t.f = {};
+        t.init();
+
+        t.d.$widget.click(function(){
+            if (t.click().returnValue() === false) {
+                return false;
+            }
+            if(!t.d.clickInside) {
+                var listModule = t.listModule();
+                listModule.d.elementClick.apply(t, [listModule]);
+                if (t.d.activateIfClick) {
+                    listModule.inactivateAllElement();
+                    t.activate();
+                }
+            }
+            t.d.clickInside = false;
+        });
+
+        if (typeof obj !== 'undefined') {
+            if (typeof obj.listModule !== 'undefined') {
+                t.listModule(obj.listModule);
+            }
+            if (typeof obj.search !== 'undefined') {
+                t.search(obj.search);
+            }
+            if (typeof obj.click !== 'undefined') {
+                t.click(obj.click);
+            }
+            if (typeof obj.activateIfClick !== 'undefined') {
+                t.activateIfClick(obj.activateIfClick);
+            }
+            if (typeof obj.activate !== 'undefined') {
+                if(obj.activate) {
+                    t.activate();
+                }
+            }
+            if (typeof obj.selected !== 'undefined') {
+                if(obj.selected) {
+                    t.select();
+                }else{
+                    t.unselect();
+                }
+            }
+            if (typeof obj.disabled !== 'undefined') {
+                if(obj.disabled) {
+                    t.disable();
+                }
+            }
+            if (typeof obj.autoClick !== 'undefined') {
+                if(obj.autoClick) {
+                    setTimeout(function(){
+                        t.widget().click();
+                    }, 50);
+                }
+            }
+            t.initParameter(obj);
+        }
+
+    };
+
+
+    var p = ListElement.prototype;
+
+    p.listModule = function (listModule) {
+        var t = this;
+        if(typeof listModule !== 'undefined'){
+            t.d.listModule = listModule;
+            return t;
+        }
+        return t.d.listModule;
+    };
+    p.search = function (search) {
+        var t = this;
+        if(typeof search !== 'undefined'){
+            t.d.search = search;
+            return t;
+        }
+        return t.d.search;
+    };
+    p.activateIfClick = function (activateIfClick) {
+        var t = this;
+        if(typeof activateIfClick !== 'undefined'){
+            t.d.activateIfClick = activateIfClick;
+            return t;
+        }
+        return t.d.activateIfClick;
+    };
+    p.remove = function () {
+        var t = this;
+        t.widget().remove();
+        t.d.removed = true;
+        var listModule = t.listModule();
+        if(!listModule.d.isMoreOpened){
+            listModule.refreshVisibleElements();
+        }
+        return t;
+    };
+    p.activate = function () {
+        var t = this;
+        t.widget().addClass('automizy-active');
+        return t;
+    };
+    p.inactivate = function () {
+        var t = this;
+        t.widget().removeClass('automizy-active');
+        return t;
+    };
+    p.disable = function () {
+        var t = this;
+        t.d.enabled = false;
+        t.widget().addClass('automizy-disable');
+        return t;
+    };
+    p.enable = function () {
+        var t = this;
+        t.d.enabled = true;
+        t.widget().removeClass('automizy-disable');
+        return t;
+    };
+    p.selected = function (selected) {
+        var t = this;
+        if(typeof selected !== 'undefined'){
+            if(selected){
+                t.select();
+            }else{
+                t.unselect();
+            }
+            return t;
+        }
+        return t.d.selected;
+    };
+    p.select = function () {
+        var t = this;
+        t.d.selected = true;
+        t.widget().addClass('automizy-selected');
+        return t;
+    };
+    p.unselect = function () {
+        var t = this;
+        t.d.selected = false;
+        t.widget().removeClass('automizy-selected');
+        return t;
+    };
+    p.click = function (func, name, life) {
+        var t = this;
+        if (typeof func === 'function') {
+            t.addFunction('click', func, name, life);
+        } else {
+            if(!t.d.enabled){
+                return t;
+            }
+            var a = t.runFunctions('click');
+            t.returnValue(!(a[0] === false || a[1] === false));
+        }
+        return t;
+    };
+
+
+    $A.initBasicFunctions(ListElement, "ListElement", ['click']);
+
+})();
+
+(function(){
+
+    var SimpleListElement = function (obj) {
+        var t = this;
+
+        obj = obj || {};
+
+        $A.m.ListElement.apply(t, [obj]);
+
+        t.d.text = '';
+
+        if (typeof obj !== 'undefined') {
+            if (typeof obj.text !== 'undefined') {
+                t.text(obj.text);
+            }
+            if (typeof obj.bold !== 'undefined') {
+                t.bold(obj.bold);
+            }
+        }
+
+        t.widget().addClass('automizy-type-simple');
+
+    };
+    SimpleListElement.prototype = Object.create($A.m.ListElement.prototype);
+    SimpleListElement.prototype.constructor = SimpleListElement;
+
+    var p = SimpleListElement.prototype;
+
+    p.text = function(text){
+        var t = this;
+        if(typeof text !== 'undefined'){
+            t.d.text = text;
+            t.widget().html(t.d.text);
+            return t;
+        }
+        return t.d.text;
+    };
+
+    p.bold = function(bold){
+        var t = this;
+        if(bold){
+            t.widget().css('font-weight', 'bold');
+        }else{
+            t.widget().css('font-weight', 'normal');
+        }
+        return t;
+    };
+
+    $A.initBasicFunctions(SimpleListElement, "SimpleListElement", []);
+
+})();
+
+(function(){
+
+    var TitleAndSubTitleListElement = function (obj) {
+        var t = this;
+
+        obj = obj || {};
+
+        $A.m.ListElement.apply(t, [obj]);
+
+        t.d.$title = $('<div class="automizy-list-element-title"></div>').appendTo(t.d.$widget);
+        t.d.$subTitle = $('<div class="automizy-list-element-subtitle"></div>').appendTo(t.d.$widget);
+
+        t.d.title = false;
+        t.d.subTitle = false;
+
+        if (typeof obj !== 'undefined') {
+            if (typeof obj.title !== 'undefined') {
+                t.title(obj.title);
+            }
+            if (typeof obj.subTitle !== 'undefined') {
+                t.subTitle(obj.subTitle);
+            }
+        }
+
+        t.widget().addClass('automizy-type-title-and-subtitle');
+
+    };
+    TitleAndSubTitleListElement.prototype = Object.create($A.m.ListElement.prototype);
+    TitleAndSubTitleListElement.prototype.constructor = TitleAndSubTitleListElement;
+
+    var p = TitleAndSubTitleListElement.prototype;
+
+    p.title = function(title){
+        var t = this;
+        if(typeof title !== 'undefined') {
+            t.d.title = title;
+            t.d.$title.html(t.d.title);
+            return t;
+        }
+        return t.d.title;
+    };
+    p.subTitle = function(subTitle){
+        var t = this;
+        if(typeof subTitle !== 'undefined') {
+            t.d.subTitle = subTitle;
+            t.d.$subTitle.html('(' + t.d.subTitle + ')');
+            return t;
+        }
+        return t.d.subTitle;
+    };
+
+    $A.initBasicFunctions(TitleAndSubTitleListElement, "TitleAndSubTitleListElement", []);
+
+})();
+
+(function(){
+
+    var BoxListElement = function (obj) {
+        var t = this;
+
+        obj = obj || {};
+
+        $A.m.ListElement.apply(t, [obj]);
+
+        t.d.$title = $('<div class="automizy-list-element-title"></div>').appendTo(t.d.$widget);
+        t.d.$subTitle = $('<div class="automizy-list-element-subtitle"></div>').appendTo(t.d.$widget);
+        t.d.$info = $('<div class="automizy-list-element-info"></div>').appendTo(t.d.$widget);
+        t.d.$badge = $('<div class="automizy-list-element-badge"></div>').appendTo(t.d.$widget);
+
+        t.d.title = false;
+        t.d.subTitle = false;
+        t.d.info = false;
+        t.d.badge = false;
+
+        if (typeof obj !== 'undefined') {
+            if (typeof obj.title !== 'undefined') {
+                t.title(obj.title);
+            }
+            if (typeof obj.subTitle !== 'undefined') {
+                t.subTitle(obj.subTitle);
+            }
+            if (typeof obj.info !== 'undefined') {
+                t.info(obj.info);
+            }
+            if (typeof obj.badge !== 'undefined') {
+                t.badge(obj.badge);
+            }
+        }
+
+        t.widget().addClass('automizy-type-box');
+
+    };
+    BoxListElement.prototype = Object.create($A.m.ListElement.prototype);
+    BoxListElement.prototype.constructor = BoxListElement;
+
+    var p = BoxListElement.prototype;
+
+    p.title = function(title){
+        var t = this;
+        if(typeof title !== 'undefined') {
+            t.d.title = title;
+            t.d.$title.html(t.d.title);
+            return t;
+        }
+        return t.d.title;
+    };
+    p.subTitle = function(subTitle){
+        var t = this;
+        if(typeof subTitle !== 'undefined') {
+            t.d.subTitle = subTitle;
+            t.d.$subTitle.html(t.d.subTitle);
+            return t;
+        }
+        return t.d.subTitle;
+    };
+    p.info = function(info){
+        var t = this;
+        if(typeof info !== 'undefined') {
+            t.d.info = info;
+            t.d.$info.html(t.d.info);
+            return t;
+        }
+        return t.d.info;
+    };
+    p.badge = function(badge){
+        var t = this;
+        if(typeof badge !== 'undefined') {
+            t.d.badge = badge;
+            t.d.$badge.html(t.d.badge);
+            return t;
+        }
+        return t.d.badge;
+    };
+
+    $A.initBasicFunctions(BoxListElement, "BoxListElement", []);
+
+})();
+
+(function(){
+
+    var IconedListElement = function (obj) {
+        var t = this;
+
+        obj = obj || {};
+
+        $A.m.ListElement.apply(t, [obj]);
+
+        t.d.$icon = $('<span class="automizy-list-element-icon fa"></span>').appendTo(t.d.$widget).click(function(){
+            if(t.d.activeIconClick) {
+                t.d.clickInside = true;
+                t.iconClick();
+            }
+        });
+        t.d.$text = $('<span class="automizy-list-element-text"></span>').appendTo(t.d.$widget);
+
+        t.d.text = false;
+        t.d.icon = false;
+        t.d.iconPosition = 'left';
+        t.d.iconClick = function(){};
+        t.d.activeIconClick = false;
+
+        if (typeof obj !== 'undefined') {
+            if (typeof obj.text !== 'undefined') {
+                t.text(obj.text);
+            }
+            if (typeof obj.icon !== 'undefined') {
+                t.icon(obj.icon);
+            }
+            if (typeof obj.iconPosition !== 'undefined') {
+                t.iconPosition(obj.iconPosition);
+            }
+            if (typeof obj.iconClick !== 'undefined') {
+                t.iconClick(obj.iconClick);
+            }
+        }
+
+        t.widget().addClass('automizy-type-iconed');
+
+    };
+    IconedListElement.prototype = Object.create($A.m.ListElement.prototype);
+    IconedListElement.prototype.constructor = IconedListElement;
+
+    var p = IconedListElement.prototype;
+
+    p.text = function(text){
+        var t = this;
+        if(typeof text !== 'undefined') {
+            t.d.text = text;
+            t.d.$text.html(t.d.text);
+            return t;
+        }
+        return t.d.text;
+    };
+    p.icon = function(icon){
+        var t = this;
+        if(typeof icon !== 'undefined') {
+            t.d.icon = icon;
+            t.d.$icon.addClass(icon);
+            return t;
+        }
+        return t.d.icon;
+    };
+    p.iconPosition = function(iconPosition){
+        var t = this;
+        if(typeof iconPosition !== 'undefined') {
+            t.d.iconPosition = iconPosition;
+            if(t.d.iconPosition === 'right'){
+                t.d.$icon.addClass('automizy-position-right').appendTo(t.d.$widget);
+            }else{
+                t.d.$icon.removeClass('automizy-position-right').prependTo(t.d.$widget);
+            }
+            return t;
+        }
+        return t.d.icon;
+    };
+    p.iconClick = function(iconClick){
+        var t = this;
+        if(typeof iconClick !== 'undefined') {
+            if(t.d.iconClick === false){
+                t.d.iconClick = function(){};
+                t.d.activeIconClick = false;
+                t.d.$icon.removeClass('automizy-clickable');
+                return t;
+            }
+            t.d.iconClick = iconClick;
+            t.d.activeIconClick = true;
+            t.d.$icon.addClass('automizy-clickable');
+            return t;
+        }
+        t.d.iconClick.apply(t, []);
+        return t;
+    };
+
+    $A.initBasicFunctions(IconedListElement, "IconedListElement", []);
+
+})();
+
+(function(){
+
+    var RowListElement = function (obj) {
+        var t = this;
+
+        obj = obj || {};
+
+        $A.m.ListElement.apply(t, [obj]);
+
+        t.d.$row = $('<div class="automizy-list-element-row"></div>').appendTo(t.d.$widget);
+
+        t.d.$remove = $('<span class="automizy-list-element-remove fa fa-remove"></span>').appendTo(t.d.$row).click(function(){
+            t.remove();
+        });
+        t.d.$infoBox = $('<div class="automizy-list-element-info-box"></div>').appendTo(t.d.$row);
+        t.d.$buttonBox = $('<div class="automizy-list-element-button-box"></div>').appendTo(t.d.$row);
+
+        t.d.$title = $('<div class="automizy-list-element-title"></div>').appendTo(t.d.$infoBox);
+        t.d.$content = $('<div class="automizy-list-element-content"></div>').appendTo(t.d.$infoBox);
+        t.d.$tags = $('<div class="automizy-list-element-tags"></div>').appendTo(t.d.$infoBox);
+
+        t.d.title = false;
+        t.d.tags = [];
+
+        if (typeof obj !== 'undefined') {
+            if (typeof obj.removable !== 'undefined') {
+                t.removable(obj.removable);
+            }
+            if (typeof obj.title !== 'undefined') {
+                t.title(obj.title);
+            }
+            if (typeof obj.content !== 'undefined') {
+                t.content(obj.content);
+            }
+            if (typeof obj.tags !== 'undefined') {
+                t.tags(obj.tags);
+            }
+        }
+
+        t.widget().addClass('automizy-type-row');
+
+    };
+    RowListElement.prototype = Object.create($A.m.ListElement.prototype);
+    RowListElement.prototype.constructor = RowListElement;
+
+    var p = RowListElement.prototype;
+
+    p.title = function(title){
+        var t = this;
+        if(typeof title !== 'undefined') {
+            t.d.title = title;
+            t.d.$title.html(t.d.title);
+            return t;
+        }
+        return t.d.title;
+    };
+    p.content = function(content){
+        var t = this;
+        if(typeof content !== 'undefined') {
+            t.d.content = content;
+            t.d.$content.html(t.d.content);
+            return t;
+        }
+        return t.d.content;
+    };
+    p.tags = function(tags){
+        var t = this;
+        if(typeof tags !== 'undefined') {
+            t.d.tags = [];
+            tags.forEach(function(tag){
+                t.addTag(tag);
+            });
+            return t;
+        }
+        return t.d.tags;
+    };
+    p.addTag = function(tag){
+        var t = this;
+        if(typeof tag !== 'undefined') {
+            var tagObj = {
+                name:tag,
+                text:tag
+            };
+            tagObj.$widget = $('<span class="automizy-list-element-tag"><i class="fa fa-filter"></i>'+tag+'</span>').appendTo(t.d.$tags);
+            t.d.tags.push(tagObj);
+            return t;
+        }
+        return t.d.tags;
+    };
+    p.removeTag = function(tag){
+        var t = this;
+        if(typeof tag !== 'undefined') {
+            t.d.tags.forEach(function(tagObj){
+                if(tagObj.name === tag){
+                    tagObj.$widget.remove();
+                }
+            });
+        }
+        return t;
+    };
+    p.removable = function(removable){
+        var t = this;
+        if(typeof removable !== 'undefined') {
+            if(removable){
+                t.d.$remove.ashow();
+            }else{
+                t.d.$remove.ahide();
+            }
+        }
+        return t;
+    };
+
+    $A.initBasicFunctions(RowListElement, "RowListElement", []);
+
+})();
+
+(function(){
     if (!Date.now) {
         Date.now = function () {
             return new Date().getTime();
@@ -10740,6 +14428,34 @@ var $A = {};
         return text;
     };
 
+})();
+
+(function(){
+    $A.selectContent = function(el) {
+        if(el instanceof jQuery){
+            el = el[0];
+        }
+
+        var sel, range;
+        if (window.getSelection && document.createRange) { //Browser compatibility
+            sel = window.getSelection();
+            if(sel.toString() == ''){ //no text selection
+                window.setTimeout(function(){
+                    range = document.createRange(); //range object
+                    range.selectNodeContents(el); //sets Range
+                    sel.removeAllRanges(); //remove all ranges from selection
+                    sel.addRange(range);//add Range to a Selection.
+                },1);
+            }
+        }else if (document.selection) { //older ie
+            sel = document.selection.createRange();
+            if(sel.text == ''){ //no text selection
+                range = document.body.createTextRange();//Creates TextRange object
+                range.moveToElementText(el);//sets Range
+                range.select(); //make selection.
+            }
+        }
+    }
 })();
 
 (function(){
@@ -10793,8 +14509,9 @@ var $A = {};
 (function(){
     $A.insertAtCaret = function(input,text) {
         var txtarea = input;
-        if(txtarea instanceof jQuery)txtarea = txtarea[0];
         if(txtarea instanceof $A.m.Input)txtarea = txtarea.input();
+        if(txtarea instanceof $A.m.Input2)txtarea = txtarea.input();
+        if(txtarea instanceof jQuery)txtarea = txtarea[0];
         var scrollPos = txtarea.scrollTop;
         var strPos = 0;
         var br = ((txtarea.selectionStart || txtarea.selectionStart == '0') ? "ff" : (document.selection ? "ie" : false ) );
@@ -10830,13 +14547,19 @@ var $A = {};
 
 (function(){
 
-    $A.delay = function (a) {
-        var timer = 0;
-        return function (callback, ms) {
-            clearTimeout(timer);
-            timer = setTimeout(callback, ms);
+    $A.delay = (function(){
+        var timer = {
+            default:0
         };
-    };
+        return function(callback, ms, name){
+            name = name || 'default';
+            if(typeof timer[name] === 'undefined'){
+                timer[name] = 0;
+            }
+            clearTimeout (timer[name]);
+            timer[name] = setTimeout(callback, ms);
+        };
+    })();
 
 })();
 
@@ -11052,12 +14775,16 @@ var $A = {};
 
 (function(){
 
-    $A.ajaxDocumentCover = function (a, b) {
+    $A.d.ajaxDocumentCoverForceStop = false;
+    $A.ajaxDocumentCover = function (a, b, c) {
         if(typeof a === 'undefined'){
             var a = false;
         }
         if(typeof b === 'undefined'){
             var b = ['auto', 'auto', 'auto'];
+        }
+        if(typeof c !== 'undefined' && c === true){
+            $A.d.ajaxDocumentCoverForceStop = true;
         }
 
         if(typeof b[0] === 'undefined'){
@@ -11115,6 +14842,12 @@ var $A = {};
             }, b[0].time);
 
         }else{
+            if(a === 'FORCE_STOP'){
+                $A.d.ajaxDocumentCoverForceStop = false;
+            }
+            if($A.d.ajaxDocumentCoverForceStop){
+                return;
+            }
             $A.d.ajaxDocumentCoverFalseTimeout = setTimeout(function(){
                 clearTimeout($A.d.ajaxDocumentCoverTimeout);
                 $("#automizy-document-cover").remove();
@@ -12132,16 +15865,27 @@ var $A = {};
 
     var $widget = $('<div id="automizy-instructions-notification"></div>');
     var $cover = $('<div id="automizy-instructions-notification-cover"></div>').appendTo($widget);
-    var $content = $('<div id="automizy-instructions-notification-content"></div>').appendTo($widget);
-    var $table = $('<table cellpadding="0" cellspacing="0" border="0" id="automizy-instructions-notification-content-table"></table>').appendTo($content);
+    var $contentBox = $('<div id="automizy-instructions-notification-content-box"></div>').appendTo($widget);
+    var $content = $('<div id="automizy-instructions-notification-content"></div>').appendTo($contentBox);
+    var $arrow = $('<div id="automizy-instructions-notification-arrow"></div>').appendTo($content);
+    var $textBox = $('<div id="automizy-instructions-notification-text-box"></div>').appendTo($content);
+    var $table = $('<table cellpadding="0" cellspacing="0" border="0" id="automizy-instructions-notification-content-table"></table>').appendTo($textBox);
     var $tr = $('<tr></tr>').appendTo($table);
     var $td1 = $('<td id="automizy-instructions-notification-content-table-td1"></td>').appendTo($tr);
     var $td2 = $('<td id="automizy-instructions-notification-content-table-td2"></td>').appendTo($tr);
     var $img = $('<img id="automizy-instructions-notification-content-image" />').appendTo($td1);
+    var $title = $('<div id="automizy-instructions-notification-content-title"></div>').appendTo($td2);
     var $text = $('<div id="automizy-instructions-notification-content-text"></div>').appendTo($td2);
     var $buttons = $('<div id="automizy-instructions-notification-content-buttons"></div>').appendTo($content);
+    var $style = $('<style></style>').appendTo($widget);
+    var cancel = $A.newButton({
+        target:$buttons,
+        width:'100px',
+        margin:'0 12px 0 0'
+    });
     var ok = $A.newButton({
         skin:'simple-orange',
+        width:'100px',
         target:$buttons
     });
 
@@ -12154,8 +15898,10 @@ var $A = {};
         $td1:$td1,
         $td2:$td2,
         $img:$img,
+        $title:$title,
         $text:$text,
         $buttons:$buttons,
+        cancelButton:cancel,
         okButton:ok
     };
 
@@ -12171,24 +15917,43 @@ var $A = {};
 
         $widget.appendTo('body:eq(0)');
         $cover.hide();
+        $arrow.hide();
         ok.hide();
+        cancel.hide();
+        $title.removeAttr('style');
         $content.removeAttr('style');
+        $content.removeClass('automizy-position');
 
         var data = {
+            cancel:false,
+            cancelText:$A.translate('Cancel'),
             ok:false,
             okText:$A.translate('OK'),
+            title:'',
             content:'',
             img:false,
             cover:false,
             position:false,
             positionTop:false,
-            positionLeft:false
+            positionLeft:false,
+            arrowPosition:false,
+            arrowOffset:false,
+            contentAnimate:false
         };
+        if (typeof obj.cancel === 'function') {
+            data.cancel = obj.cancel;
+        }
+        if (typeof obj.cancelText !== 'undefined') {
+            data.cancelText = obj.cancelText;
+        }
         if (typeof obj.ok === 'function') {
             data.ok = obj.ok;
         }
         if (typeof obj.okText !== 'undefined') {
             data.okText = obj.okText;
+        }
+        if (typeof obj.title !== 'undefined') {
+            data.title = obj.title;
         }
         if (typeof obj.content !== 'undefined') {
             data.content = obj.content;
@@ -12201,6 +15966,15 @@ var $A = {};
         }
         if (typeof obj.width !== 'undefined') {
             data.width = obj.width;
+        }
+        if (typeof obj.height !== 'undefined') {
+            data.height = obj.height;
+        }
+        if (typeof obj.arrowPosition !== 'undefined') {
+            data.arrowPosition = obj.arrowPosition
+        }
+        if (typeof obj.arrowOffset !== 'undefined') {
+            data.arrowOffset = obj.arrowOffset
         }
         if (typeof obj.position !== 'undefined') {
             data.position = obj.position
@@ -12217,29 +15991,40 @@ var $A = {};
         if (typeof obj.positionBottom !== 'undefined') {
             data.positionBottom = obj.positionBottom
         }
+        if (typeof obj.contentAnimate !== 'undefined') {
+            data.contentAnimate = obj.contentAnimate
+        }
 
         if(data.cover){
             $cover.show();
         }
+        if(data.cancel !== false){
+            cancel.off().click(data.cancel);
+            cancel.text(data.cancelText);
+            cancel.show();
+        }
         if(data.ok !== false){
-            ok.click(data.ok);
+            ok.off().click(data.ok);
             ok.text(data.okText);
             ok.show();
         }
-        if(data.src !== false){
+        if(data.img !== false){
             $img.attr({
                 src:data.img
             });
-        }else if(!$img.attr('src')){
+        }else{
             $img.attr({
                 src:'images/mizy-head-55x55.gif'
             });
         }
         if(data.width !== false){
-            $content.width(data.width);
+            $contentBox.width(data.width);
+        }
+        if(data.height !== false){
+            $content.height(data.height);
         }
         if(data.position !== false){
-            $content.css({
+            $contentBox.css({
                 top:data.position.top,
                 left:data.position.left,
                 right:data.position.right,
@@ -12247,26 +16032,48 @@ var $A = {};
             });
         }
         if(data.positionTop !== false){
-            $content.css({
+            $contentBox.css({
                 top:data.positionTop
             });
         }
         if(data.positionLeft !== false){
-            $content.css({
+            $contentBox.css({
                 left:data.positionLeft
             });
         }
         if(data.positionRight !== false){
-            $content.css({
+            $contentBox.css({
                 right:data.positionRight
             });
         }
         if(data.positionBottom !== false){
-            $content.css({
+            $contentBox.css({
                 bottom:data.positionBottom
             });
         }
+        if(data.arrowPosition !== false){
+            $arrow.show();
+        }
+        if(data.arrowOffset !== false){
+            var styleHtml = '#automizy-instructions-notification-arrow{';
+            if(data.arrowPosition === 'top') {
+                styleHtml += 'top: -25px; left: '+data.arrowOffset;
+            }else if(data.arrowPosition === 'right') {
+                styleHtml += 'right: -25px; top: '+data.arrowOffset;
+            }else if(data.arrowPosition === 'bottom') {
+                styleHtml += 'bottom: -25px; left: '+data.arrowOffset;
+            }else if(data.arrowPosition === 'left') {
+                styleHtml += 'left: -25px; top: '+data.arrowOffset;
+            }
+            styleHtml += '}';
+            $style.html(styleHtml);
+        }
+        $title.html(data.title);
         $text.html(data.content);
+        if(data.contentAnimate !== false){
+            $A.convertElementLetterToLetter($text);
+            $A.animateElementLetterToLetter($text, data.contentAnimate);
+        }
 
         $widget.show();
 
@@ -12357,12 +16164,71 @@ var $A = {};
 })();
 
 (function(){
+    $A.setContent = function (content, target) {
+        if (target.contents() instanceof jQuery) {
+            target.contents().appendTo($A.$tmp);
+        }
+        target.empty();
+        if (content instanceof jQuery) {
+            content.appendTo(target);
+        } else if(typeof content.drawTo === 'function') {
+            content.drawTo(target);
+        } else {
+            target.html(content);
+        }
+        return $A;
+    };
+})();
+
+(function(){
+
+    $A.convertElementLetterToLetter = function ($el) {
+        var html = $el.html();
+        var convertedHtml = '';
+        var char;
+        var convertActive = true;
+        for(var i = 0; i < html.length; i++){
+            char = html[i];
+            if(char === '<'){
+                convertActive = false;
+            }
+            if(convertActive){
+                convertedHtml += '<span class="automizy-letter-to-letter">' + char + '</span>';
+            }else{
+                convertedHtml += char;
+            }
+            if(char === '>'){
+                convertActive = true;
+            }
+        }
+        $el.html(convertedHtml);
+    };
+
+})();
+
+(function(){
+
+    $A.animateElementLetterToLetter = function ($el, speed) {
+        speed = speed || 10;
+        $el.find('.automizy-letter-to-letter').each(function(index ){
+            (function($item){
+                $item[0].style.visibility = 'hidden';
+                setTimeout(function(){
+                    $item[0].style.visibility = 'visible';
+                }, index * speed);
+            })($(this));
+        })
+    };
+
+})();
+
+(function(){
     $A.sameAs = function(s1, s2){
         var a = false;
         if(s1 == s2){
             return true;
         }
-        
+
         s1 = String(s1);
         s2 = String(s2);
         if(s1 == s2){
@@ -12386,7 +16252,7 @@ var $A = {};
 })();
 
 (function(){
-    //console.log('%c AutomizyJs module loaded! ', 'background: #000000; color: #bada55; font-size:14px');
+    console.log('%c AutomizyJs loaded! ', 'background: #000000; color: #bada55; font-size:14px');
 })();
 window.$A = $A;
 window.AutomizyJs = $A;

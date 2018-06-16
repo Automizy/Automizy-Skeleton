@@ -15,10 +15,7 @@
         ], function () {
             $ASP.init().ready(function () {
 
-                $AA.token().credentialsLogin({
-                    clientId: 'b6d3fc50ef2e46bd3aad7ede9e12fdc582fef042',
-                    clientSecret: 'bd4caf18ac1f5e019dc1a9f89cd629dd752370a0'
-                }).done(function(){
+                $AA.token().tokenLogin("<token>").done(function(){
                     alert('All Done');
                 })
 
@@ -26,7 +23,7 @@
         });
     </script>
 </head>
-<body>
+<body style="font-family: 'Lato'; margin:0; padding:0">
 
 </body>
 </html>

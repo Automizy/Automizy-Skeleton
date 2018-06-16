@@ -476,6 +476,34 @@ var $AA = {};
         });
     };
 
+    p.tokenLogin = function (token) {
+        var t = this;
+        token = token || false;
+
+        if (token === false) {
+            t.loginError.apply(t, ['The token must be provide!']);
+            return false;
+        }
+
+        return $.ajax({
+            type:'GET',
+            url:$AA.baseUrl() + '/ping',
+            headers:{Authorization: 'Bearer ' + token},
+            success: function (data, textStatus, jqXHR) {
+                t.set({
+                    access_token:token,
+                    expires_in:14967468700
+                });
+                t.loggedIn(true);
+                t.refreshLoopRestart();
+                t.d.loginAjaxSuccess.apply(t, [data, textStatus, jqXHR]);
+            },
+            error: function(jqXHR, textStatus, errorThrown){
+                t.d.loginAjaxError.apply(t, [jqXHR, textStatus, errorThrown]);
+            }
+        });
+    };
+
     p.login = function (obj) {
         var t = this;
         var obj = obj || {};
@@ -575,6 +603,9 @@ var $AA = {};
                 if (typeof t.d.limit === 'undefined') {
                     t.d.limit = false;
                 }
+                if (typeof t.d.searchFor === 'undefined') {
+                    t.d.searchFor = false;
+                }
                 if (typeof t.d.page === 'undefined') {
                     t.d.page = false;
                 }
@@ -599,6 +630,9 @@ var $AA = {};
                 if (typeof t.d.parentName === 'undefined') {
                     t.d.parentName = moduleNameLowerFirst;
                 }
+                if (typeof t.d.customParameters === 'undefined') {
+                    t.d.customParameters = {};
+                }
             };
         p.initParameter = p.initParameter || function (obj) {
                 var t = this;
@@ -617,6 +651,9 @@ var $AA = {};
                 if (typeof obj.limit !== 'undefined') {
                     t.limit(obj.limit);
                 }
+                if (typeof obj.searchFor !== 'undefined') {
+                    t.searchFor(obj.searchFor);
+                }
                 if (typeof obj.page !== 'undefined') {
                     t.page(obj.page);
                 }
@@ -632,6 +669,9 @@ var $AA = {};
                 if (typeof obj.links !== 'undefined') {
                     t.links(obj.links);
                 }
+                if (typeof obj.customParameters !== 'undefined') {
+                    t.customParameters(obj.customParameters);
+                }
             };
 
         p.setOptions = p.setOptions || function (obj) {
@@ -643,6 +683,9 @@ var $AA = {};
                 } //format data
                 if (typeof obj.limit !== 'undefined') {
                     t.d.option.limit = obj.limit;
+                } //hány darab
+                if (typeof obj.searchFor !== 'undefined') {
+                    t.d.option.searchFor = obj.searchFor;
                 } //hány darab
                 if (typeof obj.page !== 'undefined') {
                     t.d.option.page = obj.page;
@@ -662,6 +705,9 @@ var $AA = {};
                 if (typeof obj.links !== 'undefined') {
                     t.d.option.links = obj.links;
                 } //milyen linkek kellenek vesszővel
+                if (typeof obj.customParameters !== 'undefined') {
+                    t.d.option.customParameters = obj.customParameters;
+                }
             };
         p.getDataFromParameter = p.getDataFromParameter || function (obj) {
                 var data = {};
@@ -673,6 +719,9 @@ var $AA = {};
                 }
                 if (obj.limit !== false) {
                     data.limit = obj.limit;
+                }
+                if (obj.searchFor !== false) {
+                    data.searchFor = obj.searchFor;
                 }
                 if (obj.page !== false) {
                     data.page = obj.page;
@@ -691,6 +740,9 @@ var $AA = {};
                 }
                 if (obj.links !== false) {
                     data.links = obj.links;
+                }
+                if (obj.customParameters !== false) {
+                    data.customParameters = obj.customParameters;
                 }
                 return data;
             };
@@ -724,6 +776,11 @@ var $AA = {};
 
                 if (typeof data.order === 'undefined' && typeof data.order_by !== 'undefined') {
                     data.order = data.order_by + ':' + data.order_dir || 'asc'
+                }
+
+                var customParameters = t.customParameters();
+                for(var i in customParameters){
+                    data[i] = customParameters[i];
                 }
 
                 t.d.xhr.get = $.ajax({
@@ -805,26 +862,35 @@ var $AA = {};
                 return t.d.xhr.export;
             };
 
-        p.insert = p.insert || function (obj, async) {
+        p.insert = p.insert || function (obj, async, json) {
                 $AA.xhr[moduleNameLowerFirst + 'Modified'] = true;
                 $AA.xhr[moduleNameLowerFirst + 'GetAfterFirstModified'] = true;
                 var t = this;
+                json = json || false;
                 if (typeof async !== 'undefined') {
                     async = $AA.parseBoolean(async);
                 } else {
-                    var async = true;
+                    async = true;
                 }
 
-                var data = obj;
-
-                t.d.xhr.insert = $.ajax({
+                var ajaxData = {
                     url: $AA[moduleNameLowerFirst + 'Url']() + t.d.urlSuffix,
                     type: 'POST',
                     dataType: 'json',
                     async: async,
-                    data: data,
                     headers: {Authorization: 'Bearer ' + $AA.token().get()},
                     error: $AA.token().error()
+                };
+
+                var data = obj;
+                if (json) {
+                    data = JSON.stringify(data);
+                    ajaxData.contentType = 'application/json';
+                }
+                ajaxData.data = data;
+
+                t.d.xhr.insert = $.ajax(ajaxData).done(function(){
+                    $AA.records.refresh();
                 });
                 $AA.runEvents('insert', t, [t, moduleNameLowerFirst]);
                 if (!async) {
@@ -833,33 +899,45 @@ var $AA = {};
                 return t.d.xhr.insert;
             };
         p.insertSync = p.insertSync || function (obj) {
-                var obj = obj || false;
+                obj = obj || false;
                 return this.insert.apply(this, [obj, false]);
             };
+        p.insertJson = p.insertJson || function (obj) {
+                var obj = obj || false;
+                return this.insert.apply(this, [obj, true, true]);
+            };
 
-        p.update = p.update || function (obj, id, async) {
+        p.update = p.update || function (obj, id, async, json) {
                 $AA.xhr[moduleNameLowerFirst + 'Modified'] = true;
                 $AA.xhr[moduleNameLowerFirst + 'GetAfterFirstModified'] = true;
                 var t = this;
+                json = json || false;
                 if (typeof async !== 'undefined') {
                     async = $AA.parseBoolean(async);
                 } else {
                     var async = true;
                 }
 
-                var data = obj;
                 var id = id || obj.id || 0;
-                delete data.id;
 
-                t.d.xhr.update = $.ajax({
+                var ajaxData = {
                     url: $AA[moduleNameLowerFirst + 'Url']() + '/' + id + t.d.urlSuffix,
                     type: 'PATCH',
                     dataType: 'json',
                     async: async,
-                    data: data,
                     headers: {Authorization: 'Bearer ' + $AA.token().get()},
                     error: $AA.token().error()
-                });
+                };
+
+                var data = obj;
+                delete data.id;
+                if (json) {
+                    data = JSON.stringify(data);
+                    ajaxData.contentType = 'application/json';
+                }
+                ajaxData.data = data;
+
+                t.d.xhr.update = $.ajax(ajaxData);
                 if (!async) {
                     return t.d.xhr.update.responseJSON;
                 }
@@ -870,8 +948,13 @@ var $AA = {};
                 var id = id || false;
                 return this.update.apply(this, [obj, id, false]);
             };
+        p.updateJson = p.updateJson || function (obj, id) {
+                var obj = obj || false;
+                var id = id || false;
+                return this.update.apply(this, [obj, id, true, true]);
+            };
 
-        p.delete = p.delete || function (id, async) {
+        p.delete = p.delete || function (id, force, async) {
                 $AA.xhr[moduleNameLowerFirst + 'Modified'] = true;
                 $AA.xhr[moduleNameLowerFirst + 'GetAfterFirstModified'] = true;
                 var t = this;
@@ -880,14 +963,23 @@ var $AA = {};
                 } else {
                     var async = true;
                 }
+                var data = {};
+                var url = $AA[moduleNameLowerFirst + 'Url']() + '/' + id;
+
+                if (typeof force !== 'undefined') {
+                    url += '?force=true';
+                }
 
                 t.d.xhr.delete = $.ajax({
-                    url: $AA[moduleNameLowerFirst + 'Url']() + '/' + id + t.d.urlSuffix,
+                    url: url,
                     type: 'DELETE',
                     dataType: 'json',
                     async: async,
+                    data:data,
                     headers: {Authorization: 'Bearer ' + $AA.token().get()},
                     error: $AA.token().error()
+                }).done(function(){
+                    $AA.records.refresh();
                 });
                 if (!async) {
                     return t.d.xhr.delete.responseJSON;
@@ -896,7 +988,7 @@ var $AA = {};
             };
         p.deleteSync = p.deleteSync || function (id) {
                 var id = id || false;
-                return this.delete.apply(this, [id, false]);
+                return this.delete.apply(this, [id, true, false]);
             };
 
 
@@ -987,7 +1079,10 @@ var $AA = {};
                     headers: {Authorization: 'Bearer ' + $AA.token().get()},
                     converters: {
                         'text json': function (result) {
-                            var res = $.parseJSON(result)._embedded;
+                            var res = $.parseJSON(result);
+                            if (typeof res._embedded !== 'undefined') {
+                                res = res._embedded;
+                            }
                             res = res[Object.keys(res)[0]];
                             var arr = [];
                             for (var i in res) {
@@ -1039,6 +1134,17 @@ var $AA = {};
                     return t;
                 }
                 return t.d.option.limit;
+            };
+        p.searchFor = p.searchFor || function (searchFor) {
+                var t = this;
+                if (typeof searchFor !== 'undefined') {
+                    if(searchFor === ''){
+                        searchFor = false;
+                    }
+                    t.d.option.searchFor = searchFor;
+                    return t;
+                }
+                return t.d.option.searchFor;
             };
         p.format = p.format || function (format) {
                 var t = this;
@@ -1119,6 +1225,22 @@ var $AA = {};
                 }
                 return t.d.option.set;
             };
+        p.customParameters =  p.customParameters || function (key, value) {
+                var t = this;
+                if (typeof key !== 'undefined' && typeof value !== 'undefined') {
+                    t.d.customParameters = {};
+                    t.d.customParameters[key] = value;
+                    return t;
+                }
+                if (typeof key === 'object' || typeof key === 'array') {
+                    t.d.customParameters = {};
+                    for (var i in key) {
+                        t.d.customParameters[i] = key[i];
+                    }
+                    return t;
+                }
+                return t.d.customParameters;
+            };
         p.url = p.url || function () {
                 return $AA[moduleNameLowerFirst + 'Url'].apply(this, arguments);
             };
@@ -1150,10 +1272,15 @@ var $AA = {};
             $AA.xhr[moduleNameLowerFirst] = newModule.limit(2147483648).get().done(function (data) {
                 $AA.xhr[moduleNameLowerFirst + 'FirstRunCompleted'] = true;
                 $AA.xhr[moduleNameLowerFirst + 'Running'] = false;
-                if (newModule.d.hasEmbedded) {
-                    var arr = data._embedded[newModule.d.parentName];
-                } else {
-                    var arr = data;
+                var arr;
+                if(Array.isArray(data)){
+                    arr = data;
+                }else {
+                    if (newModule.d.hasEmbedded) {
+                        arr = data._embedded[newModule.d.parentName];
+                    } else {
+                        arr = data[newModule.d.parentName];
+                    }
                 }
 
                 for (var i = 0; i < arr.length; i++) {
@@ -3411,7 +3538,6 @@ var $AA = {};
         t.initParameter(obj || {});
     };
 
-
     var p = ContactTags.prototype;
     
     $AA.initBasicFunctions(ContactTags, "ContactTags", {
@@ -3509,7 +3635,7 @@ var $AA = {};
     var ContactsTagManager = function (obj) {
         var t = this;
         t.d = {
-            hasEmbedded:false,
+            hasEmbedded:true,
             hasId:false
         };
         t.init();
@@ -3532,8 +3658,8 @@ var $AA = {};
         var t = this;
         t.d = {
             hasEmbedded: false,
-            defaultKey:'all',
-            defaultGroup:'all'
+            defaultKey: 'AUTOMIZY',
+            defaultGroup: 'DEFAULT'
         };
         t.init();
 
@@ -3543,10 +3669,17 @@ var $AA = {};
 
     var p = LocalStorage.prototype;
 
-
     p.get = function () {
         var t = this;
-        return t.getValuesByGroupAndKey(t.d.defaultGroup, t.d.defaultKey);
+
+        if (arguments.length < 1) {
+            return t.getAll();
+        } else if (arguments.length === 1) {
+            return t.getValuesByGroup(arguments[0]);
+        }
+
+        return t.getValuesByGroupAndKey(arguments[0], arguments[1]);
+
     };
     p.getAll = function () {
         var t = this;
@@ -3567,7 +3700,7 @@ var $AA = {};
             converters: {
                 'text json': function (result) {
                     var res = $.parseJSON(result);
-                    if(typeof res[group] === 'undefined'){
+                    if (typeof res[group] === 'undefined') {
                         return null;
                     }
                     return res[group];
@@ -3596,7 +3729,7 @@ var $AA = {};
             converters: {
                 'text json': function (result) {
                     var res = $.parseJSON(result);
-                    if(typeof res[group] === 'undefined' || typeof res[group][key] === 'undefined'){
+                    if (typeof res[group] === 'undefined' || typeof res[group][key] === 'undefined') {
                         return null;
                     }
                     return res[group][key];
@@ -3606,27 +3739,32 @@ var $AA = {};
             error: $AA.token().error()
         });
     };
-    p.insert = function (value, key, group) {
+    p.insert = function () {
         var t = this;
+        var url = '';
+        var data = {};
 
-        if(typeof value === 'undefined' || value === null){
+        if (arguments.length < 1) {
             return;
+        } else if (arguments.length === 1) {
+            url = t.url() + '/' + t.d.defaultGroup + '/' + t.d.defaultKey;
+            data = {
+                value: arguments[0]
+            }
+        } else if (arguments.length === 2) {
+            url = t.url() + '/' + arguments[0];
+            data = {
+                value: arguments[1]
+            };
+        } else {
+            url = t.url() + '/' + arguments[0] + '/' + arguments[1];
+            data = {
+                value: arguments[2]
+            }
         }
-
-        if(typeof value === 'array' || typeof value === 'object'){
-            key = value.key || t.d.defaultKey;
-            group = value.group || t.d.defaultGroup;
-        }else{
-            key = key || t.d.defaultKey;
-            group = group || t.d.defaultGroup;
-        }
-
-        data = {
-            'value':value
-        };
 
         t.d.xhr.insert = $.ajax({
-            url: t.url() + '/' + group + '/' + key,
+            url: url,
             type: 'POST',
             dataType: 'json',
             data: data,
@@ -3804,6 +3942,869 @@ var $AA = {};
 })();
 
 (function(){
+    var Forms = function (obj) {
+        var t = this;
+        t.d = {
+            hasEmbedded:false,
+            parentName:'forms'
+        };
+        t.init();
+
+        t.initParameter(obj || {});
+    };
+
+    var p = Forms.prototype;
+
+    p.getPageById = function(formId){
+        var t = this;
+        return $.ajax({
+            url: $AA.forms2Url() + '/automizy/pages/'+formId,
+            type: 'GET',
+            dataType: 'json',
+            headers: {Authorization: 'Bearer ' + $AA.token().get()},
+            error: $AA.token().error()
+        });
+    };
+    
+    $AA.initBasicFunctions(Forms, "Forms2", {
+        url:'v2/forms',
+        useBaseUrl:true
+    });
+
+})();
+
+(function(){
+    var UnbounceForms = function (obj) {
+        var t = this;
+        t.d = {
+            hasEmbedded:false,
+            parentName:'forms'
+        };
+        t.init();
+
+        t.initParameter(obj || {});
+    };
+
+    var p = UnbounceForms.prototype;
+    
+    $AA.initBasicFunctions(UnbounceForms, "UnbounceForms2", {
+        url:'v2/forms/unbounce',
+        useBaseUrl:true
+    });
+
+})();
+
+(function(){
+    var OptimonkForms = function (obj) {
+        var t = this;
+        t.d = {
+            hasEmbedded:false,
+            parentName:'forms'
+        };
+        t.init();
+
+        t.initParameter(obj || {});
+    };
+
+    var p = OptimonkForms.prototype;
+    
+    $AA.initBasicFunctions(OptimonkForms, "OptimonkForms2", {
+        url:'v2/forms/optimonk',
+        useBaseUrl:true
+    });
+
+})();
+
+(function(){
+    var Emails = function (obj) {
+        var t = this;
+        t.d = {
+            hasEmbedded:false
+        };
+        t.init();
+
+        t.initParameter(obj || {});
+    };
+
+
+    var p = Emails.prototype;
+
+
+    p.getFormEmailId = function(emailId){
+        var t = this;
+        return $.ajax({
+            url: $AA.emailsUrl() + '/form/'+emailId,
+            type: 'GET',
+            dataType: 'json',
+            headers: {Authorization: 'Bearer ' + $AA.token().get()},
+            error: $AA.token().error()
+        });
+    };
+    
+    $AA.initBasicFunctions(Emails, "Emails", {
+        url:'v2/emails',
+        useBaseUrl:true
+    });
+
+})();
+
+(function(){
+    var Campaigns = function (obj) {
+        var t = this;
+        t.d = {
+            hasEmbedded:false,
+            parentName:'campaigns'
+        };
+        t.init();
+
+        t.initParameter(obj || {});
+    };
+
+
+    var p = Campaigns.prototype;
+
+    p.preview = function(recipients, id){
+        var t = this;
+        return $.ajax({
+            url: t.url() + '/' + id + '/preview' + t.d.urlSuffix,
+            type: 'POST',
+            dataType: 'json',
+            data: {
+                recipients:recipients
+            },
+            headers: {Authorization: 'Bearer ' + $AA.token().get()},
+            error: $AA.token().error()
+        });
+    };
+    p.send = function(id){
+        var t = this;
+        return $.ajax({
+            url: t.url() + '/' + id + '/send' + t.d.urlSuffix,
+            type: 'POST',
+            dataType: 'json',
+            headers: {Authorization: 'Bearer ' + $AA.token().get()},
+            error: $AA.token().error()
+        });
+    };
+    p.duplicate = function(id, type, automationId){
+        var t = this;
+        var deferred = $.Deferred();
+
+        t.getRecordById(id).done(function(campaign){
+            var xhr;
+            var newCampaign = {
+                attachments:campaign.attachments || null,
+                code:campaign.code || {editor:'', html:''},
+                embedImages:campaign.embedImages || false,
+                name:campaign.name || '',
+                notificationEmail:campaign.notificationEmail || null,
+                reply:campaign.reply || {email:'help@automizy.com'},
+                sender:campaign.sender || {email:'help@automizy.com', name:''},
+                subject:campaign.subject || '',
+                type:type || campaign.type || 'BULK'
+            };
+            if(newCampaign.type === 'AUTOMATION'){
+                campaign.automation = campaign.automation || {};
+                newCampaign.automation = {
+                    id:automationId || campaign.automation.id || 0
+                };
+                xhr = $AA.automationCampaigns().insert(newCampaign).done(function(data){
+                    $AA.xhr.campaigns2Modified = true;
+                    $AA.xhr.campaigns2GetAfterFirstModified = true;
+                    deferred.resolveWith(xhr, [data]);
+                })
+            }else{
+                xhr = $AA.bulkCampaigns().insert(newCampaign).done(function(data){
+                    $AA.xhr.campaigns2Modified = true;
+                    $AA.xhr.campaigns2GetAfterFirstModified = true;
+                    deferred.resolveWith(xhr, [data]);
+                })
+            }
+        });
+
+        return deferred;
+    };
+    p.getAllByPriorizedAutomation = function(automationId){
+        var t = this;
+        return $.ajax({
+            url: t.url() + t.d.urlSuffix,
+            type: 'GET',
+            dataType: 'json',
+            headers: {Authorization: 'Bearer ' + $AA.token().get()},
+            data: {prioritizedAutomation:automationId},
+            error: $AA.token().error()
+        });
+    };
+    p.getImages = function(id, limit){
+        var t = this;
+        id = id || false;
+        var url = t.url() + '/fileManager' + t.d.urlSuffix;
+        if(id !== false){
+            url = t.url() + '/' + id + '/fileManager' + t.d.urlSuffix;
+        }
+        return $.ajax({
+            url: url,
+            type: 'GET',
+            dataType: 'json',
+            headers: {Authorization: 'Bearer ' + $AA.token().get()},
+            data: {
+                where: [['extension', 'in', ['png', 'jpg', 'jpeg', 'gif', 'bmp']]],
+                limit:limit || 100,
+                order:'uploadedAt:desc'
+            },
+            error: $AA.token().error()
+        });
+    };
+
+    $AA.initBasicFunctions(Campaigns, "Campaigns2", {
+        url:'v2/campaigns',
+        useBaseUrl:true
+    });
+
+})();
+
+(function(){
+    var Templates = function (obj) {
+        var t = this;
+        t.d = {
+            hasEmbedded:false,
+            parentName:'templates'
+        };
+        t.init();
+
+        t.initParameter(obj || {});
+    };
+
+    var p = Templates.prototype;
+
+    /*
+    p.copy = function (id, data, done) {
+        var t = this;
+        var data = data || {};
+        data.copyData = data.copyData || {};
+        var done = done || function(){};
+        return t.getRecordById(id).done(function(getData){
+            var insertData = {
+                name:data.name || ((data.copyData.prefix || '') + getData.name + (data.copyData.suffix || '')),
+                editorCode:data.editorCode || getData.editorCode,
+                htmlCode:data.htmlCode || getData.htmlCode,
+                maxWidth:data.maxWidth || getData.maxWidth
+            };
+            return t.insert(insertData).done(function(localData){
+                done.apply(t, [localData]);
+            });
+        });
+    };
+    */
+
+    p.getGlobalTemplates = function () {
+        var t = this;
+        return $.ajax({
+            url: $AA.baseUrl() + '/v2/emails/globalTemplates',
+            type: 'GET',
+            dataType: 'json',
+            headers: {Authorization: 'Bearer ' + $AA.token().get()},
+            error: $AA.token().error()
+        });
+    };
+    p.getGlobalTemplateById = function (id) {
+        var t = this;
+        return $.ajax({
+            url: $AA.baseUrl() + '/v2/emails/globalTemplates/'+id,
+            type: 'GET',
+            dataType: 'json',
+            headers: {Authorization: 'Bearer ' + $AA.token().get()},
+            error: $AA.token().error()
+        });
+    };
+
+
+    $AA.initBasicFunctions(Templates, "Templates2", {
+        url:'v2/templates',
+        useBaseUrl:true
+    });
+
+})();
+
+(function(){
+    var Automations = function (obj) {
+        var t = this;
+        t.d = {
+            xhr:{},
+            hasEmbedded:false,
+            parentName:'automations'
+        };
+        t.init();
+        t.d.xhr.getNodesById = false;
+        t.d.xhr.acceptDraft = false;
+        t.d.xhr.discardDraft = false;
+        t.d.xhr.updateNodes = false;
+        t.d.xhr.activate = false;
+        t.d.xhr.inactivate = false;
+
+        t.initParameter(obj || {});
+    };
+
+
+    var p = Automations.prototype;
+
+    p.getNodesById = function(automationId){
+        var t = this;
+        t.d.xhr.getNodesById = $.ajax({
+            url: $AA.automations2Url() + '/' + automationId + '/nodes',
+            type: 'GET',
+            dataType: 'json',
+            headers: {Authorization: 'Bearer ' + $AA.token().get()},
+            error: $AA.token().error()
+        });
+        return t.d.xhr.getNodesById;
+    };
+    p.getNodeContacts = function(automationId, nodeId, limit, page, searchFor){
+        var t = this;
+        limit = limit || false;
+        page = page || false;
+        searchFor = searchFor || false;
+        var data = {};
+        if(limit !== false){
+            data.limit = limit;
+        }
+        if(page !== false){
+            data.page = page;
+        }
+        if(searchFor !== false){
+            data.searchFor = searchFor;
+        }
+        return $.ajax({
+            url: t.url() + '/' + automationId + '/nodes/' + nodeId + '/contacts',
+            type: 'GET',
+            dataType: 'json',
+            data:data,
+            headers: {Authorization: 'Bearer ' + $AA.token().get()},
+            error: $AA.token().error()
+        });
+    };
+
+    /*
+    p.acceptDraft = function(automationId){
+        var t = this;
+        t.d.xhr.acceptDraft = $.ajax({
+            url: $AA.automations2Url() + '/' + automationId + '/accept-draft',
+            type: 'POST',
+            dataType: 'json',
+            headers: {Authorization: 'Bearer ' + $AA.token().get()},
+            error: $AA.token().error()
+        });
+        return t.d.xhr.acceptDraft;
+    };
+    */
+    p.discardDraft = function(automationId){
+        var t = this;
+        t.d.xhr.discardDraft = $.ajax({
+            url: $AA.automations2Url() + '/' + automationId + '/nodes',
+            type: 'DELETE',
+            dataType: 'json',
+            headers: {Authorization: 'Bearer ' + $AA.token().get()},
+            error: $AA.token().error()
+        });
+        return t.d.xhr.discardDraft;
+    };
+    p.updateNodes = function(nodesJson, automationId){
+        var t = this;
+        t.d.xhr.updateNodes = $.ajax({
+            url: $AA.automations2Url() + '/' + automationId + '/nodes',
+            type: 'POST',
+            dataType: 'json',
+            data:{
+                nodes:nodesJson
+            },
+            headers: {Authorization: 'Bearer ' + $AA.token().get()},
+            error: $AA.token().error()
+        });
+        return t.d.xhr.updateNodes;
+    };
+    p.activate = function(automationId){
+        var t = this;
+        t.d.xhr.activate = $.ajax({
+            url: $AA.automations2Url() + '/' + automationId + '/activate',
+            type: 'POST',
+            dataType: 'json',
+            headers: {Authorization: 'Bearer ' + $AA.token().get()},
+            error: $AA.token().error()
+        });
+        return t.d.xhr.activate;
+    };
+    p.inactivate = function(automationId){
+        var t = this;
+        t.d.xhr.inactivate = $.ajax({
+            url: $AA.automations2Url() + '/' + automationId + '/inactivate',
+            type: 'POST',
+            dataType: 'json',
+            headers: {Authorization: 'Bearer ' + $AA.token().get()},
+            error: $AA.token().error()
+        });
+        return t.d.xhr.inactivate;
+    };
+
+    $AA.initBasicFunctions(Automations, "Automations2", {
+        url:'v2/automations',
+        useBaseUrl:true
+    });
+
+})();
+
+(function(){
+    var ContactTags = function (obj) {
+        var t = this;
+        t.d = {
+            hasEmbedded:false,
+            parentName:'contactTags'
+        };
+        t.init();
+
+        t.initParameter(obj || {});
+    };
+
+    var p = ContactTags.prototype;
+
+    $AA.initBasicFunctions(ContactTags, "ContactTags", {
+        url:'v2/contacts/tag-manager',
+        useBaseUrl:true
+    });
+
+})();
+
+(function(){
+    var CustomFields2 = function (obj) {
+        var t = this;
+        t.d = {
+            hasEmbedded:false,
+            parentName:'customFields'
+        };
+        t.init();
+
+        t.initParameter(obj || {});
+    };
+
+    var p = CustomFields2.prototype;
+    
+    $AA.initBasicFunctions(CustomFields2, "CustomFields2", {
+        url:'v2/custom-fields',
+        useBaseUrl:true
+    });
+
+})();
+
+(function(){
+    var AutomationCampaigns = function (obj) {
+        var t = this;
+        t.d = {
+            hasEmbedded:false,
+            parentName:'campaigns'
+        };
+        t.init();
+
+        t.initParameter(obj || {});
+    };
+
+
+    var p = AutomationCampaigns.prototype;
+
+    p.preview = function(recipients, id){
+        var t = this;
+        return $.ajax({
+            url: t.url() + '/' + id + '/preview' + t.d.urlSuffix,
+            type: 'POST',
+            dataType: 'json',
+            data: {
+                recipients:recipients
+            },
+            headers: {Authorization: 'Bearer ' + $AA.token().get()},
+            error: $AA.token().error()
+        });
+    };
+    p.duplicate = function(id){
+        var t = this;
+
+        return t;
+    };
+    p.getImages = function(id){
+        var t = this;
+        id = id || false;
+        var url = t.url() + '/fileManager' + t.d.urlSuffix;
+        if(id !== false){
+            url = t.url() + '/' + id + '/fileManager' + t.d.urlSuffix;
+        }
+        return $.ajax({
+            url: url,
+            type: 'GET',
+            dataType: 'json',
+            headers: {Authorization: 'Bearer ' + $AA.token().get()},
+            data: {where: [['extension', 'in', ['png', 'jpg', 'jpeg', 'gif', 'bmp']]]},
+            error: $AA.token().error()
+        });
+    };
+
+    $AA.initBasicFunctions(AutomationCampaigns, "AutomationCampaigns", {
+        url:'v2/campaigns/automation',
+        useBaseUrl:true
+    });
+
+})();
+
+(function(){
+    var BulkCampaigns = function (obj) {
+        var t = this;
+        t.d = {
+            hasEmbedded:false,
+            parentName:'campaigns'
+        };
+        t.init();
+
+        t.initParameter(obj || {});
+    };
+
+
+    var p = BulkCampaigns.prototype;
+
+    p.preview = function(recipients, id){
+        var t = this;
+        return $.ajax({
+            url: t.url() + '/' + id + '/preview' + t.d.urlSuffix,
+            type: 'POST',
+            dataType: 'json',
+            data: {
+                recipients:recipients
+            },
+            headers: {Authorization: 'Bearer ' + $AA.token().get()},
+            error: $AA.token().error()
+        });
+    };
+    p.duplicate = function(id){
+        var t = this;
+
+        return t;
+    };
+    p.getImages = function(id){
+        var t = this;
+        id = id || false;
+        var url = t.url() + '/fileManager' + t.d.urlSuffix;
+        if(id !== false){
+            url = t.url() + '/' + id + '/fileManager' + t.d.urlSuffix;
+        }
+        return $.ajax({
+            url: url,
+            type: 'GET',
+            dataType: 'json',
+            headers: {Authorization: 'Bearer ' + $AA.token().get()},
+            data: {where: [['extension', 'in', ['png', 'jpg', 'jpeg', 'gif', 'bmp']]]},
+            error: $AA.token().error()
+        });
+    };
+
+    $AA.initBasicFunctions(BulkCampaigns, "BulkCampaigns", {
+        url:'v2/campaigns/bulk',
+        useBaseUrl:true
+    });
+
+})();
+
+(function(){
+    var Segments = function (obj) {
+        var t = this;
+        t.d = {
+            hasEmbedded:false,
+            parentName:'segments'
+        };
+        t.init();
+
+        t.initParameter(obj || {});
+    };
+
+    var p = Segments.prototype;
+    
+    $AA.initBasicFunctions(Segments, "Segments2", {
+        url:'v2/segments',
+        useBaseUrl:true
+    });
+
+})();
+
+(function(){
+    var SmartLists = function (obj) {
+        var t = this;
+        t.d = {
+            hasEmbedded:false,
+            parentName:'smartLists'
+        };
+        t.init();
+
+        t.initParameter(obj || {});
+    };
+
+    var p = SmartLists.prototype;
+
+    p.getContactsById = function(smartListId, limit, page, searchFor){
+        var t = this;
+        limit = limit || false;
+        page = page || false;
+        searchFor = searchFor || false;
+        var data = {};
+        if(limit !== false){
+            data.limit = limit;
+        }
+        if(page !== false){
+            data.page = page;
+        }
+        if(searchFor !== false){
+            data.searchFor = searchFor;
+        }
+        return $.ajax({
+            url: t.url() + '/'+smartListId+'/contacts',
+            type: 'GET',
+            dataType: 'json',
+            data:data,
+            headers: {Authorization: 'Bearer ' + $AA.token().get()},
+            error: $AA.token().error()
+        });
+    };
+
+    p.getContactById = function(smartListId, contactId){
+        var t = this;
+        var data = {};
+        return $.ajax({
+            url: t.url() + '/'+smartListId+'/contacts/' + contactId,
+            type: 'GET',
+            dataType: 'json',
+            data:data,
+            headers: {Authorization: 'Bearer ' + $AA.token().get()},
+            error: $AA.token().error()
+        });
+    };
+
+    p.getPermanentlyRemovedCount = function(smartListId, contactIds, selectorType, searchFor, filter){
+        var t = this;
+        smartListId = smartListId || false;
+        contactIds = contactIds || [];
+        selectorType = selectorType || 'select';
+        searchFor = searchFor || false;
+        filter = filter || false;
+        var data = {};
+        if(smartListId === false){
+            return false;
+        }
+        data.selector = {
+            type:selectorType,
+            selection:contactIds
+        };
+        if(searchFor !== false){
+            data.searchFor = searchFor;
+        }
+        if(filter !== false){
+            data.filter = filter;
+        }
+        return $.ajax({
+            url: t.url() + '/'+smartListId+'/contacts/permanently-remove-count',
+            type: 'POST',
+            dataType: 'json',
+            data:JSON.stringify(data),
+            contentType:'application/json',
+            headers: {Authorization: 'Bearer ' + $AA.token().get()},
+            error: $AA.token().error()
+        });
+    };
+
+    p.deleteContacts = function(smartListId, contactIds, selectorType, searchFor, filter){
+        var t = this;
+        smartListId = smartListId || false;
+        contactIds = contactIds || [];
+        selectorType = selectorType || 'select';
+        searchFor = searchFor || false;
+        filter = filter || false;
+        var data = {};
+        if(smartListId === false){
+            return false;
+        }
+        data.selector = {
+            type:selectorType,
+            selection:contactIds
+        };
+        if(searchFor !== false){
+            data.searchFor = searchFor;
+        }
+        if(filter !== false){
+            data.filter = filter;
+        }
+        return $.ajax({
+            url: t.url() + '/'+smartListId+'/contacts/remove',
+            type: 'POST',
+            dataType: 'json',
+            data:JSON.stringify(data),
+            contentType:'application/json',
+            headers: {Authorization: 'Bearer ' + $AA.token().get()},
+            error: $AA.token().error()
+        });
+    };
+
+    p.addContact = function(smartListId, contactIdOrEmail){
+        var t = this;
+        smartListId = smartListId || false;
+        contactIdOrEmail = contactIdOrEmail || false;
+        if(smartListId === false || contactIdOrEmail === false){
+            return false;
+        }
+        return $.ajax({
+            url: t.url() + '/'+smartListId+'/contacts',
+            type: 'POST',
+            dataType: 'json',
+            data:JSON.stringify({
+                contacts:[contactIdOrEmail]
+            }),
+            contentType:'application/json',
+            headers: {Authorization: 'Bearer ' + $AA.token().get()},
+            error: $AA.token().error()
+        });
+    };
+    /*
+    p.deleteContact = function(smartListId, contactId, force){
+        var t = this;
+        smartListId = smartListId || false;
+        contactId = contactId || false;
+        force = force || false;
+        if(smartListId === false || contactId === false){
+            return false;
+        }
+        var data = {};
+        data.force = force;
+        return $.ajax({
+            url: t.url() + '/'+smartListId+'/contacts/' + contactId,
+            type: 'DELETE',
+            data:data,
+            headers: {Authorization: 'Bearer ' + $AA.token().get()},
+            error: $AA.token().error()
+        });
+    };
+    */
+
+    p.getFilterContactsByCriteria = function(smartListId, criteria, limit, page){
+        var t = this;
+        var searchFor = criteria.searchFor || '';
+        var searchOperator = criteria.searchOperator || 'CONTAINS';
+
+        limit = limit || false;
+        page = page || false;
+        var urlData = {};
+        if(limit !== false){
+            urlData.limit = limit;
+        }
+        if(page !== false){
+            urlData.page = page;
+        }
+        if(searchOperator !== 'CONTAINS' || (searchOperator === 'CONTAINS' && searchFor !== '')){
+            urlData.searchFor = searchFor || '';
+            urlData.searchOperator = searchOperator;
+        }
+
+        var urlParameters = '?' + $.param(urlData);
+
+        return $.ajax({
+            url: t.url() + '/'+smartListId+'/filters/calculate' + urlParameters,
+            type: 'POST',
+            dataType: 'json',
+            data:JSON.stringify({
+                criterion:criteria.criterion
+            }),
+            contentType:'application/json',
+            headers: {Authorization: 'Bearer ' + $AA.token().get()},
+            error: $AA.token().error()
+        });
+    };
+
+    p.getFilterById = function(smartListId, filterId){
+        var t = this;
+        return $.ajax({
+            url: t.url() + '/'+smartListId+'/filters/'+filterId,
+            type: 'GET',
+            contentType:'application/json',
+            headers: {Authorization: 'Bearer ' + $AA.token().get()},
+            error: $AA.token().error()
+        });
+    };
+
+    p.getImportsById = function(smartListId){
+        var t = this;
+        return $.ajax({
+            url: t.url() + '/'+smartListId+'/imports',
+            type: 'GET',
+            contentType:'application/json',
+            headers: {Authorization: 'Bearer ' + $AA.token().get()},
+            error: $AA.token().error()
+        });
+    };
+
+    p.insertFilterByCriteria = function(smartListId, name, criteria){
+        var t = this;
+        return $.ajax({
+            url: t.url() + '/'+smartListId+'/filters',
+            type: 'POST',
+            dataType: 'json',
+            data:JSON.stringify({
+                name:name,
+                criterion:criteria.criterion || criteria
+            }),
+            contentType:'application/json',
+            headers: {Authorization: 'Bearer ' + $AA.token().get()},
+            error: $AA.token().error()
+        });
+    };
+
+    p.updateFilterCriteria = function(smartListId, filterId, criteria){
+        var t = this;
+        return $.ajax({
+            url: t.url() + '/'+smartListId+'/filters/'+filterId,
+            type: 'PATCH',
+            dataType: 'json',
+            data:JSON.stringify({
+                criterion:criteria.criterion || criteria
+            }),
+            contentType:'application/json',
+            headers: {Authorization: 'Bearer ' + $AA.token().get()},
+            error: $AA.token().error()
+        });
+    };
+
+    p.updateFilterName = function(smartListId, filterId, name){
+        var t = this;
+        return $.ajax({
+            url: t.url() + '/'+smartListId+'/filters/'+filterId,
+            type: 'PATCH',
+            dataType: 'json',
+            data:JSON.stringify({
+                name:name
+            }),
+            contentType:'application/json',
+            headers: {Authorization: 'Bearer ' + $AA.token().get()},
+            error: $AA.token().error()
+        });
+    };
+
+    p.deleteFilterById = function(smartListId, filterId){
+        var t = this;
+        return $.ajax({
+            url: t.url() + '/'+smartListId+'/filters/'+filterId,
+            type: 'DELETE',
+            headers: {Authorization: 'Bearer ' + $AA.token().get()},
+            error: $AA.token().error()
+        });
+    };
+    
+    $AA.initBasicFunctions(SmartLists, "SmartLists", {
+        url:'v2/smart-lists',
+        useBaseUrl:true
+    });
+
+})();
+
+(function(){
     $AA.parseBoolean = function (value, nullOnFailure) {
         if (typeof value === 'string')
             value = value.toLowerCase();
@@ -3940,20 +4941,24 @@ var $AA = {};
         table.d.$checkboxCheckAll.prop('checked', false).change();
         table.loading();
         var xhr = $AA[apiName]().links('').fields(fields).limit(limit).page(page).where(where).orderBy(orderBy).orderDir(orderDir).urlSuffix(apiUrlSuffix).format(apiFormat).get().done(function (data) {
-            table.pageMax(data.page_count);
+            table.pageMax(data.page_count || data.pageCount || 0);
 
-            table.totalEntries(data.total_items);
+            table.totalEntries(data.total_items || data.totalItems || 0);
             table.writeEntries();
 
-
+            var records;
             if(apiItemsDir !== false){
                 var dir = apiItemsDir.split('/');
-                var records = data;
+                records = data;
                 for(var i = 0; i < dir.length; i++){
                     records = records[dir[i]];
                 }
             }else{
-                var records = data['_embedded'][apiName];
+                if(typeof data['_embedded'] === 'undefined'){
+                    records = data[apiName];
+                }else{
+                    records = data['_embedded'][apiName];
+                }
             }
 
             var length = records.length;
@@ -4180,6 +5185,69 @@ var $AA = {};
         }
         return $AA;
     };
+})();
+
+(function(){
+    var Records = function (obj) {
+        var t = this;
+        t.d = {};
+        t.d.xhr = false;
+        t.d.hasRecords = {}
+    };
+
+    var p = Records.prototype;
+
+    p.hasRecords = function(name, value){
+        var t = this;
+        if(typeof value !== 'undefined'){
+            t.d.hasRecords[name] = value;
+            return t;
+        }
+        if(typeof t.d.hasRecords[name] === 'undefined'){
+            return true;
+        }
+        return t.d.hasRecords[name];
+    };
+    p.refresh = function(){
+        var t = this;
+        return $.ajax({
+            url: $AA.recordsUrl(),
+            type: 'GET',
+            dataType: 'json',
+            headers: {Authorization: 'Bearer ' + $AA.token().get()}
+        }).done(function(data){
+            for(var i in data){
+                t.d.hasRecords[i] = $AA.parseBoolean(data[i]);
+            }
+        });
+    };
+    p.refreshOne = function(name){
+        var t = this;
+        return $.ajax({
+            url: $AA.recordsUrl(),
+            type: 'GET',
+            dataType: 'json',
+            data:{
+                fields:[name]
+            },
+            headers: {Authorization: 'Bearer ' + $AA.token().get()}
+        }).done(function(data){
+            for(var i in data){
+                t.d.hasRecords[i] = $AA.parseBoolean(data[i]);
+            }
+        });
+    };
+
+    $AA.createUrl('records')('v2/resource-availability', true);
+    $AA.m['Records'] = Records;
+    /*
+    $AA['records'] = function (obj) {
+        var t = new Records(obj);
+        return t;
+    };
+    */
+    $AA['records'] = new Records();
+
 })();
 
 (function(){

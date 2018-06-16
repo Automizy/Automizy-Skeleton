@@ -1,6 +1,6 @@
 # Automizy-Skeleton-Project ($ASP)
 
-The **Automizy-Skeleton-Project** puts a vertical bar on the right side of your website (or element). In this box you can create tabs, content blocks and groups. 
+The **Automizy-Skeleton-Project** is the best module of the world. You can use it for everything!
 
 ![screenshot 1](https://raw.github.com/automizy/automizy-skeleton-project/master/screenshot1.png)
 

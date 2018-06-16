@@ -14,11 +14,15 @@ window.AutomizyProject = function(obj){
     $API.buttons = obj.buttons || {};
     $API.forms = obj.forms || {};
     $API.functions = obj.functions || {};
+    $API.events = obj.events || {};
     $API.modules = obj.modules || {};
     $API.xhr = obj.xhr || {};
+    $API.permissions = obj.permissions || {};
+    $API.permissionGroups = obj.permissionGroups || {};
     $API.config = obj.config || {
         dir:'.',
-        url:'https://app.automizy.com'
+        url:'https://app.automizy.com',
+        initFrom:''
     };
     $API.m = obj.m || {};
     $API.d = obj.d || {};
@@ -59,14 +63,40 @@ window.AutomizyProject = function(obj){
                     plugin.complete = plugin.complete || function () {};
                     plugin.css = plugin.css || [];
                     plugin.js = plugin.js || [];
+                    plugin.dir = plugin.dir || '';
                     plugin.name = plugin.name || ('automizy-plugin-' + ++AutomizyGlobalPluginsIndex);
+                    plugin.windowVariable = plugin.windowVariable || false;
                     plugin.requiredPlugins = plugin.requiredPlugins || [];
+                    if (typeof plugin.autoload === 'undefined') {
+                        plugin.autoload = true;
+                    }
                     if (typeof plugin.js === 'string') {
                         plugin.js = [plugin.js];
+                    }
+                    if (typeof plugin.css === 'string') {
+                        plugin.css = [plugin.css];
                     }
                     if (typeof plugin.requiredPlugins === 'string') {
                         plugin.requiredPlugins = [plugin.requiredPlugins];
                     }
+
+                    if(plugin.dir === '' && plugin.js.length > 0){
+                        var uri = plugin.js[0];
+                        var lastSlashIndex = uri.lastIndexOf('/');
+                        if(lastSlashIndex <= 0){
+                            plugin.dir = '';
+                        }else {
+                            plugin.dir = uri.substring(0, lastSlashIndex);
+                        }
+                    }
+
+                    for(var j = 0; j < plugin.js.length; j++){
+                        plugin.js[j] = plugin.js[j];
+                    }
+                    for(var j = 0; j < plugin.css.length; j++){
+                        plugin.css[j] = plugin.css[j];
+                    }
+
                     t.d.plugins.push(plugin);
                 }
 
@@ -102,16 +132,6 @@ window.AutomizyProject = function(obj){
             link.type = 'text/css';
             link.href = cssFile;
             head.appendChild(link);
-            return this;
-        };
-        t.parseCss = function(css){
-            if (typeof css === 'string') {
-                t.insertCss(css);
-                return this;
-            }
-            for (var j = 0; j < css.length; j++) {
-                t.parseCss(css[j]);
-            }
             return this;
         };
 
@@ -151,10 +171,15 @@ window.AutomizyProject = function(obj){
             var t = this;
             var deferreds = [];
 
-            console.log('%c '+plugin.name + ' started to load ', 'background: #000000; color: #ffffff; font-size:12px; border-radius:0 12px 12px 0');
+            console.log('%c '+plugin.name + ' started to load ('+(plugin.js.join(', '))+')', 'background: #000000; color: #ffffff; font-size:12px; border-radius:0 12px 12px 0');
 
             for (var j = 0; j < plugin.js.length; j++) {
-                deferreds.push($.getScript(plugin.js[j]));
+                deferreds.push($.getScript(plugin.js[j]).fail(function(){
+                    console.error('FAIL to load plugin with Automizy Project Initalizer');
+                    for(var i = 0; i < arguments.length; i++){
+                        console.error(arguments[i]);
+                    }
+                }));
             }
             plugin.xhr = $.when.apply(null, deferreds);
             for(var i = 0; i < plugin.xhrAlwaysFunctions.length; i++){
@@ -194,6 +219,9 @@ window.AutomizyProject = function(obj){
 
             for (var i = 0; i < t.d.plugins.length; i++) {
                 var pluginLocal = t.d.plugins[i];
+                if (!pluginLocal.autoload) {
+                    continue;
+                }
                 if (pluginLocal.inited) {
                     continue;
                 }
@@ -246,7 +274,9 @@ window.AutomizyProject = function(obj){
                     continue;
                 }
 
-                t.parseCss(plugin.css);
+                for(var j = 0; j < plugin.css.length; j++) {
+                    t.insertCss(plugin.css[j]);
+                }
 
                 hasActivePlugin = true;
                 (function (plugin) {
@@ -375,6 +405,15 @@ window.AutomizyProject = function(obj){
         return t;
     };
 
+    $API.initFrom = function(value){
+        var t = this;
+        if (typeof value !== 'undefined') {
+            t.config.initFrom = value;
+            return t;
+        }
+        return t.config.initFrom;
+    };
+
     $API.baseDir = function(value){
         var t = this;
         if (typeof value !== 'undefined') {
@@ -383,6 +422,131 @@ window.AutomizyProject = function(obj){
         }
         return t.config.dir;
     };
+
+    $API.m.Event = function (obj) {
+        var t = this;
+        t.d = {};
+        t.d.functions = [];
+        t.d.fireType = 1;
+        t.d.fireCount = 0;
+        t.d.arguments = [];
+
+        if (typeof obj !== 'undefined') {
+            if (typeof obj.fireType !== 'undefined') {
+                t.fireType(obj.fireType);
+            }
+            if (typeof obj.fireCount !== 'undefined') {
+                t.fireCount(obj.fireCount);
+            }
+            if (typeof obj.functions !== 'undefined') {
+                t.functions(obj.functions);
+            }
+            if (typeof obj.arguments !== 'undefined') {
+                t.arguments(obj.arguments);
+            }
+        }
+
+    };
+
+    var p = $API.m.Event.prototype;
+
+    p.functions = function (functions) {
+        var t = this;
+        if (typeof functions !== 'undefined') {
+            t.d.functions = functions;
+            return t;
+        }
+        return t.d.functions;
+    };
+    p.addFunction = function (func, name, maxFireCount) {
+        var t = this;
+        var funcItem = {
+            fireCount:0,
+            maxFireCount:maxFireCount || false,
+            name:name || false,
+            function:func,
+            enabled:true
+        };
+        t.d.functions.push(funcItem);
+        if(t.fireType() === 2 && t.fireCount() >= 1){
+            t.fireFunction(funcItem)
+        }
+        return t;
+    };
+    p.disableFunctions = function (funcName) {
+        return this.toggleFunctions(false, funcName || false);
+    };
+    p.enableFunctions = function (funcName) {
+        return this.toggleFunctions(true, funcName || false);
+    };
+    p.toggleFunctions = function(value, funcName){
+        var t = this;
+        if(typeof funcName === 'undefined' || funcName === false){
+            t.d.functions.forEach(function(funcItem){
+                funcItem.enabled = value;
+            });
+            return t;
+        }
+        t.d.functions.forEach(function(funcItem){
+            if(funcItem.name === funcName){
+                funcItem.enabled = value;
+            }
+        });
+        return t;
+    };
+    p.arguments = function (arguments) {
+        var t = this;
+        if (typeof arguments !== 'undefined') {
+            t.d.arguments = arguments;
+            return t;
+        }
+        return t.d.arguments;
+    };
+    p.addArgument = function (argument) {
+        var t = this;
+        t.d.arguments.push(argument);
+        return t;
+    };
+    p.fireType = function (fireType) {
+        var t = this;
+        if (typeof fireType !== 'undefined') {
+            t.d.fireType = fireType;
+            return t;
+        }
+        return t.d.fireType;
+    };
+    p.fireCount = function (fireCount) {
+        var t = this;
+        if (typeof fireCount !== 'undefined') {
+            t.d.fireCount = fireCount;
+            return t;
+        }
+        return t.d.fireCount;
+    };
+    p.fire = function(){
+        var t = this;
+        t.d.functions.forEach(function(funcItem){
+            t.fireFunction(funcItem);
+        });
+        t.d.fireCount++;
+        return t;
+    };
+    p.fireFunction = function(funcItem){
+        var t = this;
+        if(!funcItem.enabled){
+            return t;
+        }
+        if(funcItem.maxFireCount !== false){
+            if(funcItem.fireCount < funcItem.maxFireCount){
+                funcItem.fireCount++;
+                funcItem.function.apply(t, t.arguments());
+            }
+        }else{
+            funcItem.fireCount++;
+            funcItem.function.apply(t, t.arguments());
+        }
+        return t;
+    }
 
 
     $API.functions.readyFunctions = [];
@@ -401,6 +565,9 @@ window.AutomizyProject = function(obj){
     };
 
 
+    /*$API.layoutReady = new $API.m.Event({
+        fireType:2
+    });*/
     $API.functions.layoutReadyFunctions = [];
     $API.layoutReady = function(f){
         var t = this;
@@ -423,6 +590,132 @@ window.AutomizyProject = function(obj){
             return this;
         }
         return this.d.id;
+    };
+
+    $API.functions.permissionChangeFunctions = [];
+    $API.functions.permissionChangeFunctionsByKey = {};
+    $API.permissionChange = function(f, key){
+        var t = this;
+        if(typeof f === 'function' && typeof key === 'undefined') {
+            t.functions.permissionChangeFunctions.push(f);
+            return t;
+        }
+        if(typeof f === 'function' && typeof key !== 'undefined') {
+            if(typeof t.functions.permissionChangeFunctionsByKey[key] === 'undefined'){
+                t.functions.permissionChangeFunctionsByKey[key] = [];
+            }
+            t.functions.permissionChangeFunctionsByKey[key].push(f);
+            return t;
+        }
+        $API.runTheFunctions($API.functions.permissionChangeFunctions);
+        for(var i in $API.permissions){
+            $API.runTheFunctions($API.functions.permissionChangeFunctionsByKey[i] || [], $API, [$API.permissions[i], $API.permissions[i]]); //value, from
+        }
+        return t;
+    };
+    $API.permission = function(){
+        if(typeof arguments[0] === 'undefined'){
+            return $API.permissions
+        }
+        if(typeof arguments[0] !== 'object' && typeof arguments[1] === 'undefined'){
+            return $API.permissions[arguments[0]] || false;
+        }
+        if(typeof arguments[0] !== 'object' && typeof arguments[1] !== 'undefined'){
+            $API.runTheFunctions($API.functions.permissionChangeFunctions, $API, [arguments[0], arguments[1], $API.permissions[arguments[0]]]); //key, value, from
+            $API.runTheFunctions($API.functions.permissionChangeFunctionsByKey[arguments[0]] || [], $API, [arguments[1], $API.permissions[arguments[0]]]); //value, from
+            $API.permissions[arguments[0]] = arguments[1];
+            return $API;
+        }
+        if(typeof arguments[0] === 'object' && typeof arguments[1] === 'undefined'){
+            for(var i in arguments[0]){
+                $API.runTheFunctions($API.functions.permissionChangeFunctions, $API, [i, arguments[0][i], $API.permissions[i]]); //key, value, from
+                $API.runTheFunctions($API.functions.permissionChangeFunctionsByKey[i] || [], $API, [arguments[0][i], $API.permissions[i]]); //value, from
+                $API.permissions[i] = arguments[0][i];
+            }
+            return $API;
+        }
+
+        return $API;
+    };
+
+    $API.createEvent = function(settings){
+        settings = settings || {};
+        if(typeof settings === 'string'){
+            settings = {
+                eventName:settings
+            };
+        }
+        $API.events[settings.eventName] = new $API.m.Event({
+            fireType:settings.fireType || 1,
+            arguments:settings.arguments || []
+        });
+        $API[settings.eventName] = function(funcOrArgumantsOrValue, funcName, maxFireCount){
+            if(typeof funcOrArgumantsOrValue === 'function'){
+                $API.events[settings.eventName].addFunction(funcOrArgumantsOrValue, funcName || false, maxFireCount || false);
+                return $API;
+            }else if(typeof funcOrArgumantsOrValue === 'string'){
+                if(funcOrArgumantsOrValue === 'off'){
+                    $API.events[settings.eventName].disableFunctions(funcName || false);
+                    return $API;
+                }else if(funcOrArgumantsOrValue === 'on' && typeof funcName === 'string'){
+                    $API.events[settings.eventName].enableFunctions(funcName);
+                    return $API;
+                }
+            }
+
+            if(typeof funcOrArgumantsOrValue === 'object' || typeof funcOrArgumantsOrValue === 'array'){
+                $API.events[settings.eventName].arguments(funcOrArgumantsOrValue);
+            }
+            $API.events[settings.eventName].fire();
+            return $API;
+        };
+        return $API;
+    };
+
+    $API.loadPlugin = function (pluginName, func, ajaxLoader) {
+        func = func || function(){};
+        ajaxLoader = ajaxLoader || false;
+        var pluginConfig = false;
+        for(var i = 0; i < $API.initializer.plugins.length; i++){
+            if($API.initializer.plugins[i].name === pluginName){
+                pluginConfig = $API.initializer.plugins[i];
+                break;
+            }
+        }
+        if(pluginConfig === false){
+            return false;
+        }
+        if (ajaxLoader) {
+            $A.ajaxDocumentCover(1);
+        }
+        return $API.pluginLoader.addPlugin({
+            name: pluginName,
+            skipCondition: pluginConfig.skipCondition || false,
+            js: pluginConfig.js || [],
+            css: pluginConfig.css || [],
+            autoload: true,
+            complete:function(){
+                if(typeof pluginConfig.windowVariable !== 'undefined' && pluginConfig.windowVariable !== false){
+                    window[pluginConfig.windowVariable].init().ready(function(){
+                        if (ajaxLoader) {
+                            $A.ajaxDocumentCover(0);
+                        }
+                        if(typeof pluginConfig.complete === 'function') {
+                            pluginConfig.complete.apply(this, []);
+                        }
+                        func.apply(this, []);
+                    })
+                }else{
+                    if (ajaxLoader) {
+                        $A.ajaxDocumentCover(0);
+                    }
+                    if(typeof pluginConfig.complete === 'function') {
+                        pluginConfig.complete.apply(this, []);
+                    }
+                    func.apply(this, []);
+                }
+            }
+        }).run();
     };
 
     console.log('%c ' + ($API.name || 'A module') + ' was created by AutomizyProjectInitializer! ', 'background: #000000; color: #f7ffde; font-size:14px; border-radius:0 12px 12px 0');

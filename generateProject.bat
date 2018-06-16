@@ -41,7 +41,8 @@ ren %target%\src\asp.js %moduleNameshort%.js
 ren %target%\src\asp.css %moduleNameshort%.css
 
 cd %~dp0\%target%
-call npmBowerGrunt.bat
+
+npm install & bower update & grunt bower
 
 echo New module created!
 pause;

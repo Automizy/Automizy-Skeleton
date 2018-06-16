@@ -24,7 +24,6 @@
   "authors":[
     { "name": "Gyorgy Reti", "email": "gyorgy.reti@automizy.com" },
     { "name": "Dominik Sagi", "email": "dominik.sagi@automizy.com" },
-    { "name": "Abel Enekes", "email": "abel.enekes@automizy.com" },
     { "name": "Gabor Koncz", "email": "gabor.koncz@automizy.com" }
   ],
   "repository": {
@@ -37,7 +36,7 @@
     "automizy-project-initializer": "*",
 	"fontawesome": "*",
     "automizy-icon-set": "*",
-    "automizy-js": "*",
-    "automizy-js-api": "*"
+    "automizy-js": "https://stash.automizy.com/scm/p8/automizy-js.git#master",
+    "automizy-js-api": "https://stash.automizy.com/scm/p8/automizy-js-api.git#master"
   }
 }
