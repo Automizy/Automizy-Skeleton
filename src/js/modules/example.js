@@ -60,6 +60,7 @@ define([
         };
         p.exampleBoxes = function (boxes) {
             var t = this;
+            t.removeAllExampleBox();
             if(typeof boxes !== "undefined") {
                 boxes.forEach(function (box) {
                     t.addExampleBox(box);
@@ -72,6 +73,14 @@ define([
             var t = this;
             box.target = t.widget();
             t.d.exampleBoxes.push(new $ASP.modules.ExampleBox(box));
+            return t;
+        };
+        p.removeAllExampleBox = function () {
+            var t = this;
+            t.d.exampleBoxes.forEach(function(box){
+                box.remove();
+            });
+            t.d.exampleBoxes = [];
             return t;
         };
 

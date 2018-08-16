@@ -39,7 +39,12 @@ define([
         };
         p.reset = function () {
             var t = this;
-            t.d.aVariable = false;
+            t.d.html = "";
+            return t;
+        };
+        p.remove = function () {
+            var t = this;
+            t.widget().remove();
             return t;
         };
 
