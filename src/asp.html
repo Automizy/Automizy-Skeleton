@@ -16,7 +16,28 @@
             $ASP.init().ready(function () {
 
                 $AA.token().tokenLogin("<token>").done(function(){
-                    alert('All Done');
+
+                    $ASP.open();
+
+                    window.exampleModule = new $ASP.modules.Example({
+                        target:$ASP.widget(),
+                        exampleVariable:"example",
+                        exampleBoxes:[
+                            {
+                                html:"first"
+                            },
+                            {
+                                html:"second"
+                            }
+                        ]
+                    });
+
+                    setTimeout(function(){
+                        exampleModule.addExampleBox({
+                            html:"third"
+                        })
+                    }, 1000);
+
                 })
 
             })

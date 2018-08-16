@@ -12,32 +12,12 @@
 				{
 						"name": "Gyorgy Reti",
 						"email": "gyorgy.reti@automizy.com"
-				},
-				{
-						"name": "Dominik Sagi",
-						"email": "dominik.sagi@automizy.com"
-				},
-				{
-						"name": "Abel Enekes",
-						"email": "abel.enekes@automizy.com"
-				},
-				{
-						"name": "Gabor Koncz",
-						"email": "gabor.koncz@automizy.com"
 				}
 		],
 		"keywords": [
 				"automizy-skeleton-project",
 				"automizy"
 		],
-		"bugs": {
-				"email": "gyorgy.reti@automizy.com",
-				"url": "https://github.com/Automizy/Automizy-Skeleton-Project/issues"
-		},
-		"repository": {
-				"type": "git",
-				"url": "git://github.com/automizy/automizy-skeleton-project.git"
-		},
 		"devDependencies": {
 				"grunt": "^0.4.5",
 				"grunt-contrib-requirejs": "^0.4.4",

@@ -31,11 +31,10 @@
     "url": "git://github.com/automizy/automizy-skeleton-project.git"
   },
   "dependencies": {
-    "jquery": "2.*",
+    "jquery": "https://github.com/jquery/jquery.git#2.*",
 	"requirejs": "https://github.com/jrburke/requirejs.git#master",
-    "automizy-project-initializer": "*",
-	"fontawesome": "*",
-    "automizy-icon-set": "*",
+    "fontawesome": "https://github.com/FortAwesome/Font-Awesome.git#4.*",
+    "automizy-project-initializer": "https://stash.automizy.com/scm/p8/automizy-project-initializer.git#master",
     "automizy-js": "https://stash.automizy.com/scm/p8/automizy-js.git#master",
     "automizy-js-api": "https://stash.automizy.com/scm/p8/automizy-js-api.git#master"
   }

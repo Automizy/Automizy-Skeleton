@@ -15,6 +15,9 @@ define([], function () {
     window.AutomizySkeletonProject = window.$ASP = new AutomizyProject({
         variables: {
             //key:value
+            isClosed: true,
+            closeFunction: function () {},
+            openFunction: function () {}
         },
         plugins: [
             {

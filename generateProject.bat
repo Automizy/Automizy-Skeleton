@@ -20,6 +20,9 @@ rmdir /S /Q %target%\node_modules
 rmdir /S /Q %target%\.bower
 rmdir /S /Q %target%\.idea
 rmdir /S /Q %target%\src\vendor
+del %target%\fart.exe
+del %target%\generateProject.bat
+del %target%\package-lock.json
 
 
 fart.exe -r -c -- %target%\src\* AutomizySkeletonProjectDescription "%moduleDescription%"

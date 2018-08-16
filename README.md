@@ -2,8 +2,6 @@
 
 The **Automizy-Skeleton-Project** is the best module of the world. You can use it for everything!
 
-![screenshot 1](https://raw.github.com/automizy/automizy-skeleton-project/master/screenshot1.png)
-
 ### Table of Contents
 1. [Installation](#Installation)
 2. [Usage](#Usage)
@@ -14,22 +12,12 @@ The **Automizy-Skeleton-Project** is the best module of the world. You can use i
 <a name="Installation"></a>
 ## Installation
 
-Download or fork **Automizy-Skeleton-Project** at [GitHub](https://github.com/Automizy/Automizy-Skeleton-Project).
-
-```
-git clone https://github.com/Automizy/Automizy-Skeleton-Project
-```
-
-or install with Bower:
-
-```
-bower install Automizy-Skeleton-Project
-```
+Download or fork **Automizy-Skeleton-Project** at [Stash](https://stash.automizy.com/projects/P8/repos/Automizy-Skeleton-Project).
 
 <a name="Usage"></a>
 ## Usage
 
-First, load [jQuery](http://jquery.com) (v2.2.4 or greater), [Automizy-Project-Initializer](https://github.com/Automizy/Automizy-Project-Initializer), and the plugin:
+First, load [jQuery](http://jquery.com) (v2.2.4 or greater), [Automizy-Project-Initializer](https://stash.automizy.com/projects/P8/repos/automizy-project-initializer), and the plugin:
 
 ```html
 <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js" type="text/javascript"></script>
@@ -38,7 +26,7 @@ First, load [jQuery](http://jquery.com) (v2.2.4 or greater), [Automizy-Project-I
 <link href="vendor/automizy-skeleton-project/automizy-skeleton-project.min.css" rel="stylesheet" type="text/css">
 ```
 
-Now, init the module and create a new sidebar:
+Now, init the module:
 
 ```html
 <script type="text/javascript">
@@ -80,5 +68,3 @@ $ASP.init().ready(function () {
 ## License
 
 Copyright (c) 2017 [Automizy](https://automizy.com).
-
-**Automizy-Skeleton-Project** is released under the [MIT license](http://github.com/automizy/automizy-skeleton-project/raw/master/LICENSE.md).
