@@ -45,6 +45,7 @@ define([
         p.reset = function () {
             var t = this;
             t.d.exampleVariable = false;
+            t.removeAllExampleBox();
             return t;
         };
 
@@ -60,8 +61,8 @@ define([
         };
         p.exampleBoxes = function (boxes) {
             var t = this;
-            t.removeAllExampleBox();
             if(typeof boxes !== "undefined") {
+                t.removeAllExampleBox();
                 boxes.forEach(function (box) {
                     t.addExampleBox(box);
                 });
